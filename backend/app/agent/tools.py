@@ -7,6 +7,7 @@ from typing import List, Dict, Any
 from langchain.tools import tool
 from app.services.geo_api import fetch_cities_for_country
 from app.services.travel_data_api import fetch_points_of_interest, fetch_distance_between_cities
+from app.services.culture_data import fetch_itinerary_list
 from app.models.itinerary import Itinerary
 from app import db
 
@@ -120,6 +121,24 @@ def calculate_travel_details(cities: List[str]) -> Dict[str, Any]:
             'carbon_emissions_kg': 0,
             'error': f'Error calculating distances: {str(e)}'
         }
+
+@tool
+def get_itinerary(poi: List[str], start_date: str, end_date: str) -> List[List[str]]:
+    """
+    Get a list of itineraries for a given point of interest.
+    Args:
+        poi (List[str]): List of points of interest
+        start_date (str): Start date of the trip
+        end_date (str): End date of the trip
+        
+    Returns:
+        List[List[str]]: List of itineraries
+    """
+    try:
+        return fetch_itinerary_list(poi, start_date, end_date)
+    except Exception as e:
+        print(f"Error getting itinerary: {str(e)}")
+        return []
 
 
 @tool
