@@ -11,7 +11,7 @@ from langchain import hub
 from langchain_core.prompts import MessagesPlaceholder
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 
-from app.agent.tools import get_recommended_cities, get_points_of_interest, calculate_travel_details, save_itinerary
+from app.agent.tools import get_recommended_cities, get_points_of_interest, calculate_travel_details, save_itinerary, find_flight_options
 
 
 def create_travel_agent() -> AgentExecutor:
@@ -30,25 +30,31 @@ def create_travel_agent() -> AgentExecutor:
     )
     
     # Define available tools
-    tools = [get_recommended_cities, get_points_of_interest, calculate_travel_details, save_itinerary]
+    tools = [get_recommended_cities, get_points_of_interest, calculate_travel_details, save_itinerary, find_flight_options]
     
     # Pull the standard ReAct prompt from LangChain Hub
     prompt = hub.pull("hwchase17/react-chat")
     
     # Add custom system message to make agent aware of new capabilities
-    system_message = """You are a travel planning assistant with the following capabilities:
+    system_message = """You are a comprehensive travel planning assistant with the following capabilities:
 
 1. **get_recommended_cities**: Get top cities for any country
 2. **get_points_of_interest**: Find real attractions and landmarks for any city using live OpenTripMap data
 3. **calculate_travel_details**: Calculate total driving distance and carbon emissions between cities using OpenRouteService
-4. **save_itinerary**: Save completed travel plans to the database (use this as the final step when user confirms they're happy with the plan)
+4. **find_flight_options**: Find flight options from origin city to destination country with carbon impact estimates
+5. **save_itinerary**: Save completed travel plans to the database (use this as the final step when user confirms they're happy with the plan)
 
-Your workflow should be:
-1. Help users discover cities in their desired country
-2. Find real attractions for each city using live data
-3. Calculate travel logistics (distance, carbon footprint) for the complete route
-4. Present the full itinerary with all details
-5. Ask if they want to save the itinerary, and use save_itinerary if they confirm
+Your complete workflow should be:
+1. **First Phase - Land-based Itinerary**: Help users discover cities in their desired country and create a land-based travel plan
+2. **Second Phase - Flight Planning**: After the land itinerary is complete, ask the user for their departure city and travel date
+3. **Third Phase - Flight Search**: Use find_flight_options to find ways to get to their destination country
+4. **Final Phase**: Present the complete travel plan including both land itinerary and flight options, then ask if they want to save it
+
+IMPORTANT: Always follow this sequence:
+- Start by helping with the land-based itinerary (cities, attractions, driving routes)
+- Only after that's complete, ask for departure city and travel date
+- Then search for flights to get there
+- Finally present the complete plan and offer to save it
 
 Always aim to provide real, up-to-date information and complete travel plans that users can actually execute."""
     
@@ -62,14 +68,15 @@ Always aim to provide real, up-to-date information and complete travel plans tha
     # Create the agent using ReAct pattern
     agent = create_react_agent(llm, tools, prompt)
     
-    # Create the agent executor
+    # Create the agent executor with better error handling
     agent_executor = AgentExecutor(
         agent=agent,
         tools=tools,
         verbose=True,
         return_intermediate_steps=True,
         handle_parsing_errors=True,
-        max_iterations=3
+        max_iterations=5,
+        early_stopping_method="generate"
     )
     
     return agent_executor

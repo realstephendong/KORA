@@ -35,6 +35,10 @@ class Config:
     OPENTRIPMAP_API_KEY = os.environ.get('OPENTRIPMAP_API_KEY')
     OPENROUTESERVICE_API_KEY = os.environ.get('OPENROUTESERVICE_API_KEY')
     
+    # AeroDataBox Flight API
+    AERODATABOX_API_KEY = os.environ.get('AERODATABOX_API_KEY')
+    AERODATABOX_API_HOST = os.environ.get('AERODATABOX_API_HOST')
+    
     # CORS settings
     CORS_ORIGINS = os.environ.get('CORS_ORIGINS', '*').split(',')
 
