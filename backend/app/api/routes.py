@@ -3,10 +3,11 @@ API routes for the travel planner application.
 Defines public and protected endpoints with Auth0 authentication.
 """
 
-from flask import Blueprint, jsonify, g
+from flask import Blueprint, jsonify, g, request
 from app.api.auth import require_auth_decorator, handle_auth_error, AuthError
 from app.models.user import User
 from app import db
+from app.agent.agent_executor import create_travel_agent, parse_chat_history, invoke_agent_with_history
 
 # Create API blueprint
 api_bp = Blueprint('api', __name__)
@@ -80,6 +81,89 @@ def get_user_profile():
         return jsonify({
             'error': 'server_error',
             'error_description': str(e)
+        }), 500
+
+
+@api_bp.route('/chat/message', methods=['POST'])
+@require_auth_decorator
+def chat_message():
+    """
+    Handle conversational chat with the travel planning agent.
+    Accepts a message and chat history, returns agent response.
+    
+    Expected JSON payload:
+    {
+        "message": "I want to visit France",
+        "chat_history": [
+            {"role": "human", "content": "Hi"},
+            {"role": "ai", "content": "Hello! How can I help?"}
+        ]
+    }
+    
+    Returns:
+        dict: JSON response with agent output and intermediate steps
+    """
+    try:
+        # Validate request data
+        if not request.is_json:
+            return jsonify({
+                'error': 'invalid_request',
+                'error_description': 'Request must be JSON'
+            }), 400
+        
+        data = request.get_json()
+        
+        # Validate required fields
+        if 'message' not in data:
+            return jsonify({
+                'error': 'missing_field',
+                'error_description': 'Message field is required'
+            }), 400
+        
+        user_message = data.get('message', '').strip()
+        if not user_message:
+            return jsonify({
+                'error': 'invalid_message',
+                'error_description': 'Message cannot be empty'
+            }), 400
+        
+        # Get chat history (optional, defaults to empty list)
+        chat_history_data = data.get('chat_history', [])
+        
+        # Validate chat history format
+        if not isinstance(chat_history_data, list):
+            return jsonify({
+                'error': 'invalid_chat_history',
+                'error_description': 'Chat history must be a list'
+            }), 400
+        
+        # Parse chat history to LangChain format
+        chat_history = parse_chat_history(chat_history_data)
+        
+        # Create the travel agent (stateless)
+        agent_executor = create_travel_agent()
+        
+        # Invoke the agent with the user message and history
+        result = invoke_agent_with_history(agent_executor, user_message, chat_history)
+        
+        # Return structured response
+        response_data = {
+            'response': result['output'],
+            'intermediate_steps': result.get('intermediate_steps', []),
+            'success': result.get('success', True),
+            'timestamp': g.current_user.get('sub', 'unknown')  # Include user context
+        }
+        
+        # Add error information if present
+        if 'error' in result:
+            response_data['error'] = result['error']
+        
+        return jsonify(response_data), 200
+        
+    except Exception as e:
+        return jsonify({
+            'error': 'server_error',
+            'error_description': f'Internal server error: {str(e)}'
         }), 500
 
 

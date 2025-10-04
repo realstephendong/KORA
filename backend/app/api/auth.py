@@ -11,6 +11,7 @@ from authlib.integrations.flask_oauth2 import ResourceProtector
 from authlib.jose import jwt
 from authlib.jose.errors import JoseError
 import requests
+import jwt as pyjwt
 
 
 class AuthError(Exception):
@@ -88,8 +89,8 @@ def verify_decode_jwt(token):
     jwks = jsonurl.json()
     
     try:
-        unverified_header = jwt.get_unverified_header(token)
-    except JoseError:
+        unverified_header = pyjwt.get_unverified_header(token)
+    except Exception:
         raise AuthError('invalid_header', 'Unable to parse authentication token.', 401)
     
     rsa_key = {}
@@ -105,7 +106,7 @@ def verify_decode_jwt(token):
     
     if rsa_key:
         try:
-            payload = jwt.decode(
+            payload = pyjwt.decode(
                 token,
                 rsa_key,
                 algorithms=['RS256'],
@@ -114,10 +115,10 @@ def verify_decode_jwt(token):
             )
             return payload
             
-        except jwt.ExpiredSignatureError:
+        except pyjwt.ExpiredSignatureError:
             raise AuthError('token_expired', 'Token expired.', 401)
             
-        except jwt.JWTClaimsError:
+        except pyjwt.InvalidTokenError:
             raise AuthError('invalid_claims', 'Incorrect claims. Please check the audience and issuer.', 401)
             
         except Exception:
