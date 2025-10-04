@@ -4,12 +4,16 @@ Provides tools for fetching city data, points of interest, calculating travel de
 """
 
 from typing import List, Dict, Any
+import logging
 from langchain.tools import tool
 from app.services.geo_api import fetch_cities_for_country
 from app.services.travel_data_api import fetch_points_of_interest, fetch_distance_between_cities
 from app.services.culture_data import fetch_itinerary_list
 from app.models.itinerary import Itinerary
 from app import db
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 
 @tool
@@ -25,6 +29,18 @@ def get_recommended_cities(country_name: str) -> List[str]:
         List[str]: List of the top 5 most populated city names
     """
     try:
+        # Handle case where agent passes parameter as dict string
+        if isinstance(country_name, dict):
+            country_name = country_name.get('country_name', '')
+        elif isinstance(country_name, str) and country_name.startswith('{'):
+            # Try to extract from JSON-like string
+            import json
+            try:
+                parsed = json.loads(country_name)
+                country_name = parsed.get('country_name', '')
+            except:
+                pass
+        
         cities = fetch_cities_for_country(country_name)
         return cities if cities else []
     except Exception as e:
@@ -45,6 +61,18 @@ def get_points_of_interest(city: str) -> List[str]:
         List[str]: List of attraction names
     """
     try:
+        # Handle case where agent passes parameter as dict string
+        if isinstance(city, dict):
+            city = city.get('city', '')
+        elif isinstance(city, str) and city.startswith('{'):
+            # Try to extract from JSON-like string
+            import json
+            try:
+                parsed = json.loads(city)
+                city = parsed.get('city', '')
+            except:
+                pass
+        
         # Use the OpenTripMap API to fetch real points of interest
         attractions = fetch_points_of_interest(city)
         
@@ -85,6 +113,30 @@ def calculate_travel_details(cities: List[str]) -> Dict[str, Any]:
         Dict[str, Any]: Dictionary with total_distance_km and carbon_emissions_kg
     """
     try:
+        # Handle case where agent passes parameter as dict string
+        if isinstance(cities, dict):
+            cities = cities.get('cities', [])
+        elif isinstance(cities, str) and cities.startswith('{'):
+            # Try to extract from JSON-like string
+            import json
+            try:
+                parsed = json.loads(cities)
+                cities = parsed.get('cities', [])
+            except:
+                pass
+        elif isinstance(cities, str):
+            # Handle case where cities is passed as a string like "['Paris', 'Lyon', 'Nice']"
+            import ast
+            try:
+                cities = ast.literal_eval(cities)
+            except:
+                # If that fails, try splitting by comma
+                cities = [city.strip().strip("'\"") for city in cities.split(',')]
+        
+        # Ensure cities is a list
+        if not isinstance(cities, list):
+            cities = []
+        
         if len(cities) < 2:
             return {
                 'total_distance_km': 0,
@@ -173,5 +225,69 @@ def save_itinerary(user_id: int, itinerary_name: str, cities: List[str], total_d
     except Exception as e:
         print(f"Error saving itinerary: {str(e)}")
         return f"Error saving itinerary: {str(e)}"
+
+
+@tool
+def find_flight_options(origin_city: str, destination_country: str, travel_date: str) -> List[Dict[str, Any]]:
+    """
+    Finds flight options from an origin city to a destination country for a specific date.
+    This is a simple tool that the AI can use to search for flights.
+    
+    Args:
+        origin_city (str): The departure city name
+        destination_country (str): The destination country name  
+        travel_date (str): Travel date in YYYY-MM-DD format
+        
+    Returns:
+        List[Dict[str, Any]]: List of flight options
+    """
+    try:
+        # Handle case where agent passes parameters as dict string
+        if isinstance(origin_city, dict):
+            origin_city = origin_city.get('origin_city', '')
+            destination_country = origin_city.get('destination_country', '')
+            travel_date = origin_city.get('travel_date', '')
+        elif isinstance(origin_city, str) and origin_city.startswith('{'):
+            # Try to extract from JSON-like string
+            import json
+            try:
+                parsed = json.loads(origin_city)
+                origin_city = parsed.get('origin_city', '')
+                destination_country = parsed.get('destination_country', '')
+                travel_date = parsed.get('travel_date', '')
+            except:
+                pass
+        elif isinstance(origin_city, str) and ',' in origin_city:
+            # Handle case where parameters are passed as comma-separated string
+            parts = origin_city.split(',')
+            if len(parts) >= 3:
+                origin_city = parts[0].strip()
+                destination_country = parts[1].strip()
+                travel_date = parts[2].strip()
+        
+        # Ensure we have valid parameters
+        if not origin_city or not destination_country or not travel_date:
+            logger.warning(f"Missing parameters: origin_city={origin_city}, destination_country={destination_country}, travel_date={travel_date}")
+            return [{
+                'error': 'Missing required parameters',
+                'message': 'Please provide origin city, destination country, and travel date'
+            }]
+        
+        # This is just a simple tool - let the AI decide what to do with the results
+        # The AI can use this to find flights, then separately calculate distances
+        return [{
+            'message': f'Flight search from {origin_city} to {destination_country} on {travel_date}',
+            'note': 'This is a placeholder - implement actual flight search API integration here',
+            'suggested_airlines': ['Air France', 'Lufthansa', 'British Airways', 'KLM'],
+            'estimated_duration': '8-12 hours',
+            'suggested_airports': f'Search flights to major airports in {destination_country}'
+        }]
+        
+    except Exception as e:
+        print(f"Error finding flight options: {str(e)}")
+        return [{
+            'error': f'Error searching flights: {str(e)}',
+            'message': 'Flight search temporarily unavailable'
+        }]
 
 
