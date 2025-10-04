@@ -1,0 +1,224 @@
+<head>
+  <style> 
+    body { 
+      margin: 0; 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+      overflow: hidden;
+    }
+    
+    #globeViz {
+      width: 100vw;
+      height: 100vh;
+    }
+    
+    .search-container {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 1000;
+      width: 320px;
+    }
+    
+    .search-input {
+      width: 100%;
+      padding: 12px 16px;
+      border: none;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.95);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      font-size: 16px;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+    
+    .search-input:focus {
+      box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.2);
+    }
+    
+    .search-results {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: rgba(255, 255, 255, 0.98);
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+      margin-top: 8px;
+      max-height: 300px;
+      overflow-y: auto;
+      display: none;
+    }
+    
+    .search-result {
+      padding: 12px 16px;
+      cursor: pointer;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+      transition: background-color 0.15s ease;
+    }
+    
+    .search-result:hover {
+      background-color: #E3F2FD;
+    }
+    
+    .search-result:last-child {
+      border-bottom: none;
+    }
+    
+    .fade-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: white;
+      opacity: 0;
+      transition: opacity 0.8s ease-in-out;
+      pointer-events: none;
+      z-index: 2000;
+    }
+    
+    .fade-overlay.active {
+      opacity: 1;
+    }
+  </style>
+
+  <script src="//cdn.jsdelivr.net/npm/globe.gl"></script>
+</head>
+
+<body>
+  <div id="globeViz"></div>
+  
+  <!-- Search Container -->
+  <div class="search-container">
+    <input 
+      type="text" 
+      class="search-input" 
+      placeholder="Search for a country..."
+      id="countrySearch"
+    />
+    <div class="search-results" id="searchResults"></div>
+  </div>
+  
+  <!-- Fade Overlay -->
+  <div class="fade-overlay" id="fadeOverlay"></div>
+
+  <script>
+    let countriesData = [];
+    let isZooming = false;
+    
+    const world = new Globe(document.getElementById('globeViz'))
+      .globeImageUrl('//cdn.jsdelivr.net/npm/three-globe/example/img/earth-blue-marble.jpg')
+      .backgroundImageUrl('//cdn.jsdelivr.net/npm/three-globe/example/img/night-sky.png')
+      .pointOfView({ altitude: 2.5 }, 0)
+      .polygonCapColor(() => 'rgba(74, 144, 226, 0.6)')
+      .polygonSideColor(() => 'rgba(74, 144, 226, 0.1)')
+      .polygonStrokeColor(() => 'rgba(44, 90, 160, 0.8)')
+      .polygonLabel(({ properties: d }) => `
+          <b>${d.ADMIN || d.NAME}</b> <br />
+          <i>Click to explore travel options</i>
+        `);
+
+    // Auto-rotate
+    world.controls().autoRotate = true;
+    world.controls().autoRotateSpeed = 0.5;
+
+    // Load countries data
+    fetch('ne_110m_admin_0_countries.geojson').then(res => res.json()).then(countries => {
+      countriesData = countries.features.filter(d => d.properties.ISO_A2 !== 'AQ');
+      world.polygonsData(countriesData);
+    });
+
+    // Search functionality
+    const searchInput = document.getElementById('countrySearch');
+    const searchResults = document.getElementById('searchResults');
+    const fadeOverlay = document.getElementById('fadeOverlay');
+
+    searchInput.addEventListener('input', (e) => {
+      const query = e.target.value.toLowerCase();
+      if (query.length < 2) {
+        searchResults.style.display = 'none';
+        return;
+      }
+
+      const matches = countriesData.filter(country => {
+        const name = (country.properties.ADMIN || country.properties.NAME || '').toLowerCase();
+        return name.includes(query);
+      }).slice(0, 10);
+
+      if (matches.length > 0) {
+        searchResults.innerHTML = matches.map(country => 
+          `<div class="search-result" data-country='${JSON.stringify(country)}'>
+            ${country.properties.ADMIN || country.properties.NAME}
+          </div>`
+        ).join('');
+        searchResults.style.display = 'block';
+      } else {
+        searchResults.style.display = 'none';
+      }
+    });
+
+    // Handle country selection
+    searchResults.addEventListener('click', (e) => {
+      if (e.target.classList.contains('search-result')) {
+        const country = JSON.parse(e.target.dataset.country);
+        selectCountry(country);
+      }
+    });
+
+    // Hide search results when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.search-container')) {
+        searchResults.style.display = 'none';
+      }
+    });
+
+    function selectCountry(country) {
+      if (isZooming) return;
+      
+      isZooming = true;
+      searchInput.disabled = true;
+      searchResults.style.display = 'none';
+      
+      // Calculate country center
+      const coordinates = country.geometry.coordinates;
+      let totalLat = 0, totalLng = 0, pointCount = 0;
+      
+      const processCoords = (coords) => {
+        if (Array.isArray(coords[0])) {
+          if (typeof coords[0][0] === 'number') {
+            coords.forEach(coord => {
+              if (Array.isArray(coord) && coord.length >= 2) {
+                totalLng += coord[0];
+                totalLat += coord[1];
+                pointCount++;
+              }
+            });
+          } else {
+            coords.forEach(subCoords => processCoords(subCoords));
+          }
+        }
+      };
+      
+      processCoords(coordinates);
+      
+      if (pointCount > 0) {
+        const centerLat = totalLat / pointCount;
+        const centerLng = totalLng / pointCount;
+        
+        // Zoom to country
+        world.pointOfView({ lat: centerLat, lng: centerLng, altitude: 1.5 }, 2000);
+        
+        // Start fade effect
+        setTimeout(() => {
+          fadeOverlay.classList.add('active');
+          
+          // After fade completes, log the selection (ready for next page)
+          setTimeout(() => {
+            console.log('Selected country:', country.properties.ADMIN || country.properties.NAME);
+            // TODO: Navigate to next page here
+          }, 1000);
+        }, 2500);
+      }
+    }
+  </script>
+</body>
