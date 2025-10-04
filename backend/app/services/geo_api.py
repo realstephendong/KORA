@@ -26,61 +26,150 @@ def fetch_cities_for_country(country_name: str) -> List[str]:
     try:
         # Get API credentials from environment
         rapidapi_key = os.environ.get('RAPIDAPI_KEY')
-        rapidapi_host = os.environ.get('RAPIDAPI_HOST', 'geodb-cities.p.rapidapi.com')
+        rapidapi_host = os.environ.get('RAPIDAPI_HOST', 'wft-geo-db.p.rapidapi.com')
         
         if not rapidapi_key:
             logger.error("RAPIDAPI_KEY not found in environment variables")
             return []
         
-        # Use the GeoDB Cities REST API to find cities directly
-        # First, find the country code using the countries endpoint
-        country_url = 'https://geodb-cities.p.rapidapi.com/geo/countries'
+        # Use the GeoDB Cities REST API "Find cities" endpoint directly
+        # Map common country names to their ISO country codes
+        country_code_map = {
+            'france': 'FR',
+            'united states': 'US',
+            'usa': 'US',
+            'america': 'US',
+            'united kingdom': 'GB',
+            'uk': 'GB',
+            'england': 'GB',
+            'germany': 'DE',
+            'italy': 'IT',
+            'spain': 'ES',
+            'japan': 'JP',
+            'china': 'CN',
+            'canada': 'CA',
+            'australia': 'AU',
+            'brazil': 'BR',
+            'india': 'IN',
+            'russia': 'RU',
+            'mexico': 'MX',
+            'south korea': 'KR',
+            'korea': 'KR',
+            'netherlands': 'NL',
+            'belgium': 'BE',
+            'switzerland': 'CH',
+            'austria': 'AT',
+            'sweden': 'SE',
+            'norway': 'NO',
+            'denmark': 'DK',
+            'finland': 'FI',
+            'poland': 'PL',
+            'czech republic': 'CZ',
+            'hungary': 'HU',
+            'portugal': 'PT',
+            'greece': 'GR',
+            'turkey': 'TR',
+            'south africa': 'ZA',
+            'egypt': 'EG',
+            'morocco': 'MA',
+            'tunisia': 'TN',
+            'algeria': 'DZ',
+            'nigeria': 'NG',
+            'kenya': 'KE',
+            'ghana': 'GH',
+            'senegal': 'SN',
+            'ivory coast': 'CI',
+            'cameroon': 'CM',
+            'ethiopia': 'ET',
+            'tanzania': 'TZ',
+            'uganda': 'UG',
+            'rwanda': 'RW',
+            'burundi': 'BI',
+            'madagascar': 'MG',
+            'mauritius': 'MU',
+            'seychelles': 'SC',
+            'comoros': 'KM',
+            'djibouti': 'DJ',
+            'somalia': 'SO',
+            'eritrea': 'ER',
+            'sudan': 'SD',
+            'south sudan': 'SS',
+            'central african republic': 'CF',
+            'chad': 'TD',
+            'niger': 'NE',
+            'mali': 'ML',
+            'burkina faso': 'BF',
+            'guinea': 'GN',
+            'sierra leone': 'SL',
+            'liberia': 'LR',
+            'cote d\'ivoire': 'CI',
+            'ivory coast': 'CI',
+            'ghana': 'GH',
+            'togo': 'TG',
+            'benin': 'BJ',
+            'burkina faso': 'BF',
+            'niger': 'NE',
+            'mali': 'ML',
+            'mauritania': 'MR',
+            'senegal': 'SN',
+            'gambia': 'GM',
+            'guinea-bissau': 'GW',
+            'cape verde': 'CV',
+            'sao tome and principe': 'ST',
+            'equatorial guinea': 'GQ',
+            'gabon': 'GA',
+            'congo': 'CG',
+            'democratic republic of the congo': 'CD',
+            'angola': 'AO',
+            'zambia': 'ZM',
+            'zimbabwe': 'ZW',
+            'botswana': 'BW',
+            'namibia': 'NA',
+            'lesotho': 'LS',
+            'swaziland': 'SZ',
+            'malawi': 'MW',
+            'mozambique': 'MZ',
+            'madagascar': 'MG',
+            'mauritius': 'MU',
+            'seychelles': 'SC',
+            'comoros': 'KM',
+            'mayotte': 'YT',
+            'reunion': 'RE',
+            'saint helena': 'SH',
+            'ascension island': 'AC',
+            'tristan da cunha': 'TA'
+        }
+        
+        # Handle both string and dict inputs
+        if isinstance(country_name, dict):
+            country_name_str = country_name.get('country_name', '').lower()
+        else:
+            country_name_str = str(country_name).lower()
+        
+        country_code = country_code_map.get(country_name_str)
+        
+        if not country_code:
+            logger.warning(f"No country code found for {country_name}")
+            return []
+        
         headers = {
             'x-rapidapi-key': rapidapi_key,
             'x-rapidapi-host': rapidapi_host
         }
         
-        # Find countries matching the name
-        country_params = {
-            'namePrefix': country_name,
-            'limit': 10  # Get more results to find the right country
-        }
-        
-        country_response = requests.get(country_url, headers=headers, params=country_params, timeout=10)
-        
-        if country_response.status_code != 200:
-            logger.error(f"Country lookup failed with status {country_response.status_code}")
-            logger.error(f"Response: {country_response.text}")
-            return []
-        
-        country_data = country_response.json()
-        countries = country_data.get('data', [])
-        
-        if not countries:
-            logger.warning(f"No countries found for {country_name}")
-            return []
-        
-        # Get the country code - try to find exact match first
-        country_code = None
-        for country in countries:
-            if country.get('name', '').lower() == country_name.lower():
-                country_code = country.get('code')
-                break
-        
-        # If no exact match, use the first result
-        if not country_code:
-            country_code = countries[0].get('code')
-            
-        if not country_code:
-            logger.warning(f"No country code found for {country_name}")
-            return []
-        
-        # Now use the "Find country places" endpoint to get cities
-        cities_url = f'https://geodb-cities.p.rapidapi.com/geo/countries/{country_code}/places'
+        # Use the "Find cities" endpoint with countryIds parameter
+        cities_url = 'https://wft-geo-db.p.rapidapi.com/v1/geo/cities'
         cities_params = {
+            'countryIds': country_code,
             'limit': 5,
-            'sort': '-population'  # Sort by population descending
+            'sort': '-population',  # Sort by population descending
+            'types': 'CITY'  # Only get cities, not other types
         }
+        
+        # Debug: Log the request details
+        logger.info(f"Making API request to: {cities_url}")
+        logger.info(f"With params: {cities_params}")
+        logger.info(f"With headers: {headers}")
         
         cities_response = requests.get(cities_url, headers=headers, params=cities_params, timeout=10)
         
@@ -91,6 +180,11 @@ def fetch_cities_for_country(country_name: str) -> List[str]:
         
         cities_data = cities_response.json()
         cities_list = cities_data.get('data', [])
+        
+        # Debug: Log the actual response
+        logger.info(f"API Response for {country_name} (code: {country_code}): {len(cities_list)} cities found")
+        if cities_list:
+            logger.info(f"First city: {cities_list[0]}")
         
         # Extract city names
         cities = []
@@ -125,14 +219,14 @@ def fetch_city_details(city_name: str) -> Dict[str, Any]:
     """
     try:
         rapidapi_key = os.environ.get('RAPIDAPI_KEY')
-        rapidapi_host = os.environ.get('RAPIDAPI_HOST', 'geodb-cities.p.rapidapi.com')
+        rapidapi_host = os.environ.get('RAPIDAPI_HOST', 'wft-geo-db.p.rapidapi.com')
         
         if not rapidapi_key:
             logger.error("RAPIDAPI_KEY not found in environment variables")
             return {}
         
         # Use the GeoDB Cities REST API for city details
-        cities_url = 'https://geodb-cities.p.rapidapi.com/geo/places'
+        cities_url = 'https://wft-geo-db.p.rapidapi.com/v1/geo/cities'
         headers = {
             'x-rapidapi-key': rapidapi_key,
             'x-rapidapi-host': rapidapi_host
@@ -183,7 +277,7 @@ def get_iata_code(city_name: str) -> str | None:
     """
     try:
         rapidapi_key = os.environ.get('RAPIDAPI_KEY')
-        rapidapi_host = os.environ.get('RAPIDAPI_HOST', 'geodb-cities.p.rapidapi.com')
+        rapidapi_host = os.environ.get('RAPIDAPI_HOST', 'wft-geo-db.p.rapidapi.com')
         
         if not rapidapi_key:
             logger.error("RAPIDAPI_KEY not found in environment variables")

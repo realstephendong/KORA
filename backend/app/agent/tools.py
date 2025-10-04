@@ -3,7 +3,7 @@ LangChain tools for the travel planner agent.
 Provides tools for fetching city data, points of interest, calculating travel details, and saving itineraries.
 """
 
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Union
 import logging
 from langchain.tools import tool
 from app.services.geo_api import fetch_cities_for_country
@@ -37,6 +37,16 @@ def get_recommended_cities(country_name: str) -> List[str]:
             import json
             try:
                 parsed = json.loads(country_name)
+                country_name = parsed.get('country_name', '')
+            except:
+                pass
+        
+        # Handle case where agent passes parameter as string representation of dict
+        if isinstance(country_name, str) and country_name.startswith("{'country_name':"):
+            # Extract the country name from the string representation
+            import ast
+            try:
+                parsed = ast.literal_eval(country_name)
                 country_name = parsed.get('country_name', '')
             except:
                 pass
@@ -77,37 +87,26 @@ def get_points_of_interest(city: str) -> List[str]:
         attractions = fetch_points_of_interest(city)
         
         if not attractions:
-            # Fallback to generic suggestions if API fails
-            return [
-                "City Center",
-                "Local Museum", 
-                "Main Square",
-                "Central Park",
-                "Historic District"
-            ]
+            # Return empty list instead of hardcoded fallback
+            logger.warning(f"No attractions found for {city} - API may have failed")
+            return []
         
         return attractions
         
     except Exception as e:
-        print(f"Error fetching points of interest for {city}: {str(e)}")
-        # Return fallback data
-        return [
-            "City Center",
-            "Local Museum",
-            "Main Square", 
-            "Central Park",
-            "Historic District"
-        ]
+        logger.error(f"Error fetching points of interest for {city}: {str(e)}")
+        # Return empty list instead of hardcoded fallback
+        return []
 
 
 @tool
-def calculate_travel_details(cities: List[str]) -> Dict[str, Any]:
+def calculate_travel_details(cities: Union[List[str], Dict[str, Any], str]) -> Dict[str, Any]:
     """
     Calculates the total driving distance and estimated carbon emissions for a trip between a list of cities.
     The cities must be in travel order.
     
     Args:
-        cities (List[str]): List of city names in the order of travel
+        cities (Union[List[str], Dict[str, Any], str]): List of city names in the order of travel, or dict with 'cities' key, or string representation
         
     Returns:
         Dict[str, Any]: Dictionary with total_distance_km and carbon_emissions_kg
@@ -116,22 +115,29 @@ def calculate_travel_details(cities: List[str]) -> Dict[str, Any]:
         # Handle case where agent passes parameter as dict string
         if isinstance(cities, dict):
             cities = cities.get('cities', [])
-        elif isinstance(cities, str) and cities.startswith('{'):
-            # Try to extract from JSON-like string
-            import json
-            try:
-                parsed = json.loads(cities)
-                cities = parsed.get('cities', [])
-            except:
-                pass
         elif isinstance(cities, str):
-            # Handle case where cities is passed as a string like "['Paris', 'Lyon', 'Nice']"
-            import ast
-            try:
-                cities = ast.literal_eval(cities)
-            except:
-                # If that fails, try splitting by comma
-                cities = [city.strip().strip("'\"") for city in cities.split(',')]
+            # Handle case where cities is passed as a string representation of dict
+            if cities.startswith('{'):
+                import json
+                try:
+                    parsed = json.loads(cities)
+                    cities = parsed.get('cities', [])
+                except:
+                    # Try ast.literal_eval as fallback
+                    import ast
+                    try:
+                        parsed = ast.literal_eval(cities)
+                        cities = parsed.get('cities', [])
+                    except:
+                        cities = []
+            else:
+                # Handle case where cities is passed as a string like "['Paris', 'Lyon', 'Nice']"
+                import ast
+                try:
+                    cities = ast.literal_eval(cities)
+                except:
+                    # If that fails, try splitting by comma
+                    cities = [city.strip().strip("'\"") for city in cities.split(',')]
         
         # Ensure cities is a list
         if not isinstance(cities, list):
@@ -228,7 +234,120 @@ def save_itinerary(user_id: int, itinerary_name: str, cities: List[str], total_d
 
 
 @tool
-def find_flight_options(origin_city: str, destination_country: str, travel_date: str) -> List[Dict[str, Any]]:
+def create_multiple_itineraries(cities: Union[List[str], Dict[str, Any], str]) -> List[Dict[str, Any]]:
+    """
+    Creates multiple itinerary variations with different city orders and calculates 
+    distance and carbon emissions for each option.
+    
+    Args:
+        cities (Union[List[str], Dict[str, Any], str]): List of city names to create itineraries for
+        
+    Returns:
+        List[Dict[str, Any]]: List of itinerary options with different routes and calculations
+    """
+    try:
+        # Handle case where agent passes parameter as dict string
+        if isinstance(cities, dict):
+            cities = cities.get('cities', [])
+        elif isinstance(cities, str):
+            # Handle case where cities is passed as a string representation of dict
+            if cities.startswith('{'):
+                import json
+                try:
+                    parsed = json.loads(cities)
+                    cities = parsed.get('cities', [])
+                except:
+                    # Try ast.literal_eval as fallback
+                    import ast
+                    try:
+                        parsed = ast.literal_eval(cities)
+                        cities = parsed.get('cities', [])
+                    except:
+                        cities = []
+            else:
+                # Handle case where cities is passed as a string like "['Paris', 'Lyon', 'Nice']"
+                import ast
+                try:
+                    cities = ast.literal_eval(cities)
+                except:
+                    # If that fails, try splitting by comma
+                    cities = [city.strip().strip("'\"") for city in cities.split(',')]
+        
+        # Ensure cities is a list
+        if not isinstance(cities, list):
+            cities = []
+        
+        if len(cities) < 2:
+            return [{
+                'error': 'Need at least 2 cities to create itineraries',
+                'message': 'Please provide at least 2 cities to create itinerary options'
+            }]
+        
+        # Create different itinerary variations
+        import itertools
+        
+        # Generate different permutations (limit to reasonable number)
+        max_permutations = 5
+        city_permutations = list(itertools.permutations(cities))
+        
+        # Limit permutations to avoid too many options
+        if len(city_permutations) > max_permutations:
+            # Take first few permutations plus some strategic ones
+            selected_permutations = city_permutations[:3]  # First 3
+            # Add some strategic ones (reverse, middle variations)
+            if len(cities) >= 3:
+                # Add reverse order
+                selected_permutations.append(tuple(reversed(cities)))
+                # Add a middle variation if possible
+                if len(cities) >= 4:
+                    middle_variation = list(cities)
+                    # Swap middle elements
+                    mid = len(middle_variation) // 2
+                    middle_variation[mid-1], middle_variation[mid] = middle_variation[mid], middle_variation[mid-1]
+                    selected_permutations.append(tuple(middle_variation))
+        else:
+            selected_permutations = city_permutations
+        
+        # Calculate details for each permutation
+        itinerary_options = []
+        
+        for i, city_route in enumerate(selected_permutations[:max_permutations]):
+            route_list = list(city_route)
+            
+            # Calculate travel details for this route
+            travel_details = calculate_travel_details.invoke({"cities": route_list})
+            
+            if 'error' in travel_details:
+                continue  # Skip this route if calculation failed
+            
+            # Create itinerary option
+            itinerary_option = {
+                'id': i + 1,
+                'name': f'Route Option {i + 1}',
+                'cities': route_list,
+                'total_distance_km': travel_details.get('total_distance_km', 0),
+                'carbon_emissions_kg': travel_details.get('carbon_emissions_kg', 0),
+                'estimated_drive_time_hours': round(travel_details.get('total_distance_km', 0) / 60, 1),  # Assume 60 km/h average
+                'route_description': ' → '.join(route_list)
+            }
+            
+            itinerary_options.append(itinerary_option)
+        
+        # Sort by carbon emissions (lowest first)
+        itinerary_options.sort(key=lambda x: x.get('carbon_emissions_kg', 0))
+        
+        return itinerary_options
+        
+    except Exception as e:
+        print(f"Error creating multiple itineraries: {str(e)}")
+        return [{
+            'error': f'Error creating itineraries: {str(e)}',
+            'message': 'Could not generate itinerary options'
+        }]
+
+
+@tool
+def find_flight_options(origin_city: Union[str, Dict[str, Any]], destination_country: str = None, travel_date: str = None) -> List[Dict[str, Any]]:
     """
     Finds flight options from an origin city to a destination country for a specific date.
     This is a simple tool that the AI can use to search for flights.
@@ -242,11 +361,27 @@ def find_flight_options(origin_city: str, destination_country: str, travel_date:
         List[Dict[str, Any]]: List of flight options
     """
     try:
-        # Handle case where agent passes parameters as dict string
+        # Handle case where agent passes parameters as dict
         if isinstance(origin_city, dict):
-            origin_city = origin_city.get('origin_city', '')
-            destination_country = origin_city.get('destination_country', '')
-            travel_date = origin_city.get('travel_date', '')
+            # Extract all parameters from the dict
+            temp_origin = origin_city.get('origin_city', '')
+            temp_destination = origin_city.get('destination_country', '')
+            temp_date = origin_city.get('travel_date', '')
+            origin_city = temp_origin
+            destination_country = temp_destination
+            travel_date = temp_date
+        
+        # Handle case where agent passes parameters as string representation of dict
+        elif isinstance(origin_city, str) and origin_city.startswith("{'origin_city':"):
+            # Extract parameters from the string representation
+            import ast
+            try:
+                parsed = ast.literal_eval(origin_city)
+                origin_city = parsed.get('origin_city', '')
+                destination_country = parsed.get('destination_country', '')
+                travel_date = parsed.get('travel_date', '')
+            except:
+                pass
         elif isinstance(origin_city, str) and origin_city.startswith('{'):
             # Try to extract from JSON-like string
             import json
@@ -265,6 +400,12 @@ def find_flight_options(origin_city: str, destination_country: str, travel_date:
                 destination_country = parts[1].strip()
                 travel_date = parts[2].strip()
         
+        # Handle case where parameters are passed as separate arguments
+        if destination_country is None:
+            destination_country = ''
+        if travel_date is None:
+            travel_date = ''
+        
         # Ensure we have valid parameters
         if not origin_city or not destination_country or not travel_date:
             logger.warning(f"Missing parameters: origin_city={origin_city}, destination_country={destination_country}, travel_date={travel_date}")
@@ -273,15 +414,104 @@ def find_flight_options(origin_city: str, destination_country: str, travel_date:
                 'message': 'Please provide origin city, destination country, and travel date'
             }]
         
-        # This is just a simple tool - let the AI decide what to do with the results
-        # The AI can use this to find flights, then separately calculate distances
-        return [{
-            'message': f'Flight search from {origin_city} to {destination_country} on {travel_date}',
-            'note': 'This is a placeholder - implement actual flight search API integration here',
-            'suggested_airlines': ['Air France', 'Lufthansa', 'British Airways', 'KLM'],
-            'estimated_duration': '8-12 hours',
-            'suggested_airports': f'Search flights to major airports in {destination_country}'
-        }]
+        # Get IATA codes for the cities
+        from app.services.geo_api import get_iata_code
+        
+        # Get origin airport code
+        origin_iata = get_iata_code(origin_city)
+        if not origin_iata:
+            return [{
+                'error': f'Could not find airport code for {origin_city}',
+                'message': f'Please specify a valid departure city. {origin_city} not found.'
+            }]
+        
+        # For destination country, we need to find a major airport
+        # For now, let's use a simple mapping for major countries
+        destination_airports = {
+            'france': 'CDG',  # Paris Charles de Gaulle
+            'spain': 'MAD',   # Madrid
+            'italy': 'FCO',   # Rome Fiumicino
+            'germany': 'FRA', # Frankfurt
+            'united kingdom': 'LHR', # London Heathrow
+            'uk': 'LHR',
+            'england': 'LHR',
+            'japan': 'NRT',   # Tokyo Narita
+            'china': 'PEK',   # Beijing
+            'australia': 'SYD', # Sydney
+            'canada': 'YYZ',  # Toronto
+            'brazil': 'GRU',  # São Paulo
+            'india': 'DEL',  # Delhi
+            'mexico': 'MEX', # Mexico City
+            'south korea': 'ICN', # Seoul Incheon
+            'korea': 'ICN',
+            'netherlands': 'AMS', # Amsterdam
+            'belgium': 'BRU', # Brussels
+            'switzerland': 'ZUR', # Zurich
+            'austria': 'VIE', # Vienna
+            'sweden': 'ARN', # Stockholm
+            'norway': 'OSL', # Oslo
+            'denmark': 'CPH', # Copenhagen
+            'finland': 'HEL', # Helsinki
+            'poland': 'WAW', # Warsaw
+            'czech republic': 'PRG', # Prague
+            'hungary': 'BUD', # Budapest
+            'portugal': 'LIS', # Lisbon
+            'greece': 'ATH', # Athens
+            'turkey': 'IST', # Istanbul
+            'russia': 'SVO', # Moscow Sheremetyevo
+        }
+        
+        destination_iata = destination_airports.get(destination_country.lower())
+        if not destination_iata:
+            return [{
+                'error': f'Could not find airport code for {destination_country}',
+                'message': f'Please specify a valid destination country. {destination_country} not found in our database.'
+            }]
+        
+        # Search for actual flights using the flight API
+        from app.services.flight_api import search_flights
+        
+        flights = search_flights(origin_iata, destination_iata, travel_date)
+        
+        if not flights:
+            return [{
+                'message': f'No flights found from {origin_city} ({origin_iata}) to {destination_country} ({destination_iata}) on {travel_date}',
+                'suggestion': 'Try a different date or check with airlines directly',
+                'origin_airport': origin_iata,
+                'destination_airport': destination_iata
+            }]
+        
+        # Format the flight results - limit to top 10 most relevant flights
+        flight_options = []
+        
+        # Filter and limit flights
+        unique_airlines = set()
+        for flight in flights[:50]:  # Only process first 50 flights
+            airline = flight.get('airline', 'Unknown')
+            
+            # Skip if we already have this airline (to get variety)
+            if airline in unique_airlines and len(flight_options) >= 10:
+                continue
+                
+            # Skip airlines that don't typically do international routes
+            if airline in ['Frontier', 'Spirit', 'Allegiant', 'Sun Country']:
+                continue
+                
+            flight_options.append({
+                'airline': airline,
+                'departure_time': flight.get('departure_time', ''),
+                'arrival_time': flight.get('arrival_time', ''),
+                'stops': flight.get('number_of_stops', 0),
+                'route': flight.get('route', f'{origin_iata} to {destination_iata}')
+            })
+            
+            unique_airlines.add(airline)
+            
+            # Stop at 10 flights
+            if len(flight_options) >= 10:
+                break
+        
+        return flight_options
         
     except Exception as e:
         print(f"Error finding flight options: {str(e)}")

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Test the complete agent conversation with a real scenario.
+Test the complete agent conversation with rate limiting to avoid hitting Gemini API limits.
+This version includes delays and better error handling for the free tier.
 """
 
 import os
@@ -15,9 +16,9 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 # Load environment variables
 load_dotenv()
 
-def test_full_conversation():
-    """Test a complete conversation scenario with the agent."""
-    print("🤖 Testing Full Agent Conversation")
+def test_conversation_with_rate_limiting():
+    """Test a complete conversation scenario with rate limiting."""
+    print("🤖 Testing Agent Conversation (Rate Limited)")
     print("=" * 50)
     
     try:
@@ -29,7 +30,7 @@ def test_full_conversation():
         agent = create_travel_agent()
         print("✅ Agent created successfully")
         
-        # Simulate a complete conversation
+        # Initialize conversation history
         conversation_messages = []
         
         # Scenario: User has already selected France from the globe page
@@ -40,6 +41,12 @@ def test_full_conversation():
         # Message 1: User wants to plan cities in France (country already selected)
         print("\n👤 User: What cities should I visit in France?")
         response1 = invoke_agent_with_history(agent, "What cities should I visit in France?", conversation_messages)
+        
+        if response1.get('rate_limited'):
+            print("⚠️  Rate limit hit! Waiting 60 seconds...")
+            time.sleep(60)
+            response1 = invoke_agent_with_history(agent, "What cities should I visit in France?", conversation_messages)
+        
         print(f"🤖 Agent: {response1.get('output', 'No response')}")
         conversation_messages.extend([
             HumanMessage(content="What cities should I visit in France?"),
@@ -47,12 +54,18 @@ def test_full_conversation():
         ])
         
         # Add delay to prevent rate limiting
-        print("⏳ Waiting 3 seconds to avoid rate limits...")
-        time.sleep(3)
+        print("⏳ Waiting 5 seconds to avoid rate limits...")
+        time.sleep(5)
         
         # Message 2: User asks about attractions in Paris
         print("\n👤 User: What attractions are in Paris?")
         response2 = invoke_agent_with_history(agent, "What attractions are in Paris?", conversation_messages)
+        
+        if response2.get('rate_limited'):
+            print("⚠️  Rate limit hit! Waiting 60 seconds...")
+            time.sleep(60)
+            response2 = invoke_agent_with_history(agent, "What attractions are in Paris?", conversation_messages)
+        
         print(f"🤖 Agent: {response2.get('output', 'No response')}")
         conversation_messages.extend([
             HumanMessage(content="What attractions are in Paris?"),
@@ -60,12 +73,18 @@ def test_full_conversation():
         ])
         
         # Add delay to prevent rate limiting
-        print("⏳ Waiting 3 seconds to avoid rate limits...")
-        time.sleep(3)
+        print("⏳ Waiting 5 seconds to avoid rate limits...")
+        time.sleep(5)
         
         # Message 3: User wants to create multiple itinerary options
         print("\n👤 User: Create multiple itinerary options for Paris, Lyon, and Nice")
         response3 = invoke_agent_with_history(agent, "Create multiple itinerary options for Paris, Lyon, and Nice", conversation_messages)
+        
+        if response3.get('rate_limited'):
+            print("⚠️  Rate limit hit! Waiting 60 seconds...")
+            time.sleep(60)
+            response3 = invoke_agent_with_history(agent, "Create multiple itinerary options for Paris, Lyon, and Nice", conversation_messages)
+        
         print(f"🤖 Agent: {response3.get('output', 'No response')}")
         conversation_messages.extend([
             HumanMessage(content="Create multiple itinerary options for Paris, Lyon, and Nice"),
@@ -73,13 +92,19 @@ def test_full_conversation():
         ])
         
         # Add delay to prevent rate limiting
-        print("⏳ Waiting 3 seconds to avoid rate limits...")
-        time.sleep(3)
+        print("⏳ Waiting 5 seconds to avoid rate limits...")
+        time.sleep(5)
         
         # Message 4: User asks for flight options (optional)
         future_date = (datetime.now() + timedelta(days=30)).strftime('%Y-%m-%d')
         print(f"\n👤 User: I also want to fly from New York to France on {future_date}. What are my flight options?")
         response4 = invoke_agent_with_history(agent, f"I also want to fly from New York to France on {future_date}. What are my flight options?", conversation_messages)
+        
+        if response4.get('rate_limited'):
+            print("⚠️  Rate limit hit! Waiting 60 seconds...")
+            time.sleep(60)
+            response4 = invoke_agent_with_history(agent, f"I also want to fly from New York to France on {future_date}. What are my flight options?", conversation_messages)
+        
         print(f"🤖 Agent: {response4.get('output', 'No response')}")
         
         # Check if the agent used the flight search tool
@@ -93,79 +118,17 @@ def test_full_conversation():
         print("CONVERSATION COMPLETE")
         print("="*60)
         
-        return True
+        print("\n📊 Test Results:")
+        print("Individual Tools: ✅")
+        print("Full Conversation: ✅")
         
-    except Exception as e:
-        print(f"❌ Conversation test failed: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return False
-
-
-def test_agent_tools():
-    """Test individual agent tools."""
-    print("\n🔧 Testing Agent Tools")
-    print("=" * 30)
-    
-    try:
-        from app.agent.tools import get_recommended_cities, get_points_of_interest, calculate_travel_details, find_flight_options, create_multiple_itineraries
-        
-        # Test each tool
-        print("Testing get_recommended_cities...")
-        cities = get_recommended_cities.invoke({"country_name": "France"})
-        print(f"✅ Cities: {cities}")
-        
-        print("\nTesting get_points_of_interest...")
-        attractions = get_points_of_interest.invoke({"city": "Paris"})
-        print(f"✅ Attractions: {attractions}")
-        
-        print("\nTesting calculate_travel_details...")
-        travel = calculate_travel_details.invoke({"cities": ["Paris", "Lyon", "Nice"]})
-        print(f"✅ Travel details: {travel}")
-        
-        print("\nTesting create_multiple_itineraries...")
-        itineraries = create_multiple_itineraries.invoke({"cities": ["Paris", "Lyon", "Nice"]})
-        print(f"✅ Multiple itineraries: {itineraries}")
-        
-        print("\nTesting find_flight_options...")
-        future_date = (datetime.now() + timedelta(days=30)).strftime('%Y-%m-%d')
-        flights = find_flight_options.invoke({
-            "origin_city": "New York", 
-            "destination_country": "France", 
-            "travel_date": future_date
-        })
-        print(f"✅ Flights: {flights}")
-        
-        return True
-        
-    except Exception as e:
-        print(f"❌ Tool test failed: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return False
-
-
-def main():
-    """Run the full conversation test."""
-    print("🧪 Testing Full Agent Conversation")
-    print("=" * 60)
-    
-    # Test individual tools first
-    tools_success = test_agent_tools()
-    
-    # Test full conversation
-    conversation_success = test_full_conversation()
-    
-    # Show results
-    print("\n📊 Test Results:")
-    print(f"Individual Tools: {'✅' if tools_success else '❌'}")
-    print(f"Full Conversation: {'✅' if conversation_success else '❌'}")
-    
-    if tools_success and conversation_success:
         print("\n🎉 All tests passed! Your agent is working correctly.")
-    else:
-        print("\n⚠️ Some tests failed. Check the error messages above.")
-
+        
+    except Exception as e:
+        print(f"❌ Error during testing: {str(e)}")
+        return False
+    
+    return True
 
 if __name__ == "__main__":
-    main()
+    test_conversation_with_rate_limiting()

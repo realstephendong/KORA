@@ -4,6 +4,7 @@ Handles conversational memory and tool integration with ReAct pattern.
 """
 
 import os
+import time
 from typing import List, Dict, Any
 from langchain.agents import AgentExecutor, create_react_agent
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -11,7 +12,7 @@ from langchain import hub
 from langchain_core.prompts import MessagesPlaceholder
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 
-from app.agent.tools import get_recommended_cities, get_points_of_interest, calculate_travel_details, save_itinerary, find_flight_options
+from app.agent.tools import get_recommended_cities, get_points_of_interest, calculate_travel_details, save_itinerary, find_flight_options, create_multiple_itineraries
 
 
 def create_travel_agent() -> AgentExecutor:
@@ -30,7 +31,7 @@ def create_travel_agent() -> AgentExecutor:
     )
     
     # Define available tools
-    tools = [get_recommended_cities, get_points_of_interest, calculate_travel_details, save_itinerary, find_flight_options]
+    tools = [get_recommended_cities, get_points_of_interest, calculate_travel_details, save_itinerary, find_flight_options, create_multiple_itineraries]
     
     # Pull the standard ReAct prompt from LangChain Hub
     prompt = hub.pull("hwchase17/react-chat")
@@ -41,20 +42,49 @@ def create_travel_agent() -> AgentExecutor:
 1. **get_recommended_cities**: Get top cities for any country
 2. **get_points_of_interest**: Find real attractions and landmarks for any city using live OpenTripMap data
 3. **calculate_travel_details**: Calculate total driving distance and carbon emissions between cities using OpenRouteService
-4. **find_flight_options**: Find flight options from origin city to destination country with carbon impact estimates
-5. **save_itinerary**: Save completed travel plans to the database (use this as the final step when user confirms they're happy with the plan)
+4. **create_multiple_itineraries**: Create multiple itinerary variations with different city orders and carbon calculations
+5. **find_flight_options**: Find flight options from origin city to destination country with carbon impact estimates
+6. **save_itinerary**: Save completed travel plans to the database (use this as the final step when user confirms they're happy with the plan)
 
-Your complete workflow should be:
-1. **First Phase - Land-based Itinerary**: Help users discover cities in their desired country and create a land-based travel plan
-2. **Second Phase - Flight Planning**: After the land itinerary is complete, ask the user for their departure city and travel date
-3. **Third Phase - Flight Search**: Use find_flight_options to find ways to get to their destination country
-4. **Final Phase**: Present the complete travel plan including both land itinerary and flight options, then ask if they want to save it
+## WORKFLOW (Country is already selected by user):
+
+**Layer 1 - City Discovery:**
+- The user has already selected a country (this is given context)
+- Ask: "What cities do you want to visit in [COUNTRY]?" 
+- Use get_recommended_cities to suggest top cities in that country
+- Let the user choose 3-5 cities they're interested in
+
+**Layer 2 - Attraction Discovery:**
+- For each selected city, ask: "What places do you want to visit in [CITY]?"
+- Use get_points_of_interest to suggest real attractions and landmarks
+- Let the user select their preferred attractions for each city
+
+**Layer 3 - Itinerary Creation:**
+- Use create_multiple_itineraries to generate multiple different itinerary options based on their city selections
+- This will automatically create different city orders/routes and calculate distance and carbon emissions for each
+- Present 3-5 different itinerary options with:
+  - Different city orders/routes
+  - Total distance and carbon emissions
+  - Estimated travel time
+  - Key attractions included
+
+**Layer 4 - Flight Planning (Optional):**
+- Only if user wants to fly to the country, ask for their departure city and travel date
+- Use find_flight_options to find ways to get to their destination country
+- Present flight options with carbon impact
+
+**Final Phase:**
+- Present all itinerary options with filters for price and carbon emissions
+- Let user select their preferred itinerary
+- Offer to save the final selected itinerary
 
 IMPORTANT: Always follow this sequence:
-- Start by helping with the land-based itinerary (cities, attractions, driving routes)
-- Only after that's complete, ask for departure city and travel date
-- Then search for flights to get there
-- Finally present the complete plan and offer to save it
+- Start with city recommendations (country is already known)
+- Then get attraction preferences for each city
+- Create multiple itinerary options with calculations
+- Present options with filters
+- Only handle flights if user specifically requests them
+- Save the final selected itinerary
 
 Always aim to provide real, up-to-date information and complete travel plans that users can actually execute."""
     
@@ -129,7 +159,7 @@ def invoke_agent_with_history(
             "chat_history": chat_history
         }
         
-        # Invoke the agent
+        # Invoke the agent with rate limit handling
         result = agent_executor.invoke(input_data)
         
         return {
@@ -139,9 +169,21 @@ def invoke_agent_with_history(
         }
         
     except Exception as e:
+        error_msg = str(e)
+        
+        # Handle rate limit errors specifically
+        if "429" in error_msg or "quota" in error_msg.lower() or "rate limit" in error_msg.lower():
+            return {
+                "output": "I'm currently experiencing high demand. Please wait a moment and try again, or consider upgrading to a paid plan for higher rate limits.",
+                "intermediate_steps": [],
+                "success": False,
+                "error": "Rate limit exceeded",
+                "rate_limited": True
+            }
+        
         return {
-            "output": f"I apologize, but I encountered an error: {str(e)}",
+            "output": f"I apologize, but I encountered an error: {error_msg}",
             "intermediate_steps": [],
             "success": False,
-            "error": str(e)
+            "error": error_msg
         }

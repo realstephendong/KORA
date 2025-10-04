@@ -61,6 +61,13 @@ def search_flights(from_iata: str, to_iata: str, date: str) -> List[Dict[str, An
         # Parse the response
         data = response.json()
         
+        # Debug: Log the structure of the response
+        logger.info(f"API Response structure: {list(data.keys())}")
+        if 'departures' in data:
+            logger.info(f"Number of departures: {len(data.get('departures', []))}")
+            if data.get('departures'):
+                logger.info(f"First departure structure: {list(data['departures'][0].keys())}")
+        
         # Handle API errors
         if 'error' in data:
             logger.error(f"API error: {data['error']}")
@@ -75,20 +82,21 @@ def search_flights(from_iata: str, to_iata: str, date: str) -> List[Dict[str, An
                 # Extract basic flight information
                 airline = flight.get('airline', {}).get('name', 'Unknown')
                 number_of_stops = flight.get('stops', 0)
+                aircraft_model = flight.get('aircraft', {}).get('model', 'Unknown')
                 
-                # Calculate duration in minutes
-                departure_time = flight.get('departure', {}).get('scheduledTimeLocal', '')
-                arrival_time = flight.get('arrival', {}).get('scheduledTimeLocal', '')
-                duration_minutes = _calculate_duration(departure_time, arrival_time)
+                # Extract time information from the movement object
+                movement = flight.get('movement', {})
+                scheduled_time = movement.get('scheduledTime', {})
+                departure_time = scheduled_time.get('local', '')
                 
-                # Create flight option dictionary
+                # Create flight option dictionary with real data from API
                 flight_option = {
                     'airline': airline,
-                    'number_of_stops': number_of_stops,
-                    'duration_minutes': duration_minutes,
+                    'aircraft': aircraft_model,
+                    'stops': number_of_stops,
                     'departure_time': departure_time,
-                    'arrival_time': arrival_time,
-                    'route': f"{from_iata} to {to_iata}"
+                    'route': f"{from_iata} to {to_iata}",
+                    'is_direct': number_of_stops == 0
                 }
                 
                 flights.append(flight_option)
@@ -109,6 +117,70 @@ def search_flights(from_iata: str, to_iata: str, date: str) -> List[Dict[str, An
     except Exception as e:
         logger.error(f"Unexpected error searching flights: {str(e)}")
         return []
+
+
+def _get_city_name_from_iata(iata_code: str) -> str:
+    """
+    Map IATA airport codes to city names for carbon calculations.
+    
+    Args:
+        iata_code (str): IATA airport code
+        
+    Returns:
+        str: City name
+    """
+    # Common IATA to city mappings
+    iata_to_city = {
+        'JFK': 'New York',
+        'LGA': 'New York', 
+        'EWR': 'New York',
+        'CDG': 'Paris',
+        'LHR': 'London',
+        'FRA': 'Frankfurt',
+        'MAD': 'Madrid',
+        'FCO': 'Rome',
+        'LAX': 'Los Angeles',
+        'SFO': 'San Francisco',
+        'ORD': 'Chicago',
+        'ATL': 'Atlanta',
+        'MIA': 'Miami',
+        'SEA': 'Seattle',
+        'BOS': 'Boston',
+        'DFW': 'Dallas',
+        'DEN': 'Denver',
+        'LAS': 'Las Vegas',
+        'PHX': 'Phoenix',
+        'IAH': 'Houston',
+        'MCO': 'Orlando',
+        'YVR': 'Vancouver',
+        'YYZ': 'Toronto',
+        'YUL': 'Montreal',
+        'NRT': 'Tokyo',
+        'ICN': 'Seoul',
+        'PEK': 'Beijing',
+        'SYD': 'Sydney',
+        'MEL': 'Melbourne',
+        'GRU': 'São Paulo',
+        'DEL': 'Delhi',
+        'MEX': 'Mexico City',
+        'AMS': 'Amsterdam',
+        'BRU': 'Brussels',
+        'ZUR': 'Zurich',
+        'VIE': 'Vienna',
+        'ARN': 'Stockholm',
+        'OSL': 'Oslo',
+        'CPH': 'Copenhagen',
+        'HEL': 'Helsinki',
+        'WAW': 'Warsaw',
+        'PRG': 'Prague',
+        'BUD': 'Budapest',
+        'LIS': 'Lisbon',
+        'ATH': 'Athens',
+        'IST': 'Istanbul',
+        'SVO': 'Moscow'
+    }
+    
+    return iata_to_city.get(iata_code, '')
 
 
 def _calculate_duration(departure_time: str, arrival_time: str) -> int:
