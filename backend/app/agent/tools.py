@@ -234,16 +234,20 @@ def save_itinerary(user_id: int, itinerary_name: str, cities: List[str], total_d
 
 
 @tool
-def create_multiple_itineraries(cities: Union[List[str], Dict[str, Any], str]) -> List[Dict[str, Any]]:
+def create_multiple_itineraries(cities: Union[List[str], Dict[str, Any], str], origin_city: str = None, travel_date: str = None, destination_country: str = None, food_budget: float = None) -> List[Dict[str, Any]]:
     """
     Creates multiple itinerary variations with different city orders and calculates 
-    distance and carbon emissions for each option.
+    distance, carbon emissions, and total costs (including flights) for each option.
     
     Args:
         cities (Union[List[str], Dict[str, Any], str]): List of city names to create itineraries for
+        origin_city (str, optional): Origin city for flight calculations
+        travel_date (str, optional): Travel date for flight calculations (YYYY-MM-DD format)
+        destination_country (str, optional): Destination country for flight calculations
+        food_budget (float, optional): User's total food budget for the entire trip
         
     Returns:
-        List[Dict[str, Any]]: List of itinerary options with different routes and calculations
+        List[Dict[str, Any]]: List of itinerary options with different routes, calculations, and costs
     """
     try:
         # Handle case where agent passes parameter as dict string
@@ -308,6 +312,32 @@ def create_multiple_itineraries(cities: Union[List[str], Dict[str, Any], str]) -
         else:
             selected_permutations = city_permutations
         
+        # Get flight costs if flight parameters are provided
+        flight_costs = []
+        if origin_city and travel_date and destination_country:
+            try:
+                # Use the flight API to get real flight costs
+                from app.services.flight_api import search_flights
+                from app.services.geo_api import get_iata_code
+                
+                # Get IATA codes
+                origin_iata = get_iata_code(origin_city)
+                dest_iata = get_iata_code(destination_country)
+                
+                if origin_iata and dest_iata:
+                    flights = search_flights(origin_iata, dest_iata, travel_date)
+                    if flights:
+                        # Extract prices from flight results
+                        flight_costs = [flight.get('price', 500) for flight in flights if 'price' in flight]
+                    else:
+                        flight_costs = [500]  # Default fallback
+                else:
+                    flight_costs = [500]  # Default fallback
+                    
+            except Exception as e:
+                print(f"Error getting flight costs: {str(e)}")
+                flight_costs = [500]  # Default estimated cost
+        
         # Calculate details for each permutation
         itinerary_options = []
         
@@ -320,6 +350,25 @@ def create_multiple_itineraries(cities: Union[List[str], Dict[str, Any], str]) -
             if 'error' in travel_details:
                 continue  # Skip this route if calculation failed
             
+            # Calculate land-based costs
+            distance_km = travel_details.get('total_distance_km', 0)
+            estimated_fuel_cost = distance_km * 0.15  # $0.15 per km for fuel
+            estimated_accommodation_cost = len(route_list) * 100  # $100 per city for accommodation (placeholder)
+            
+            # Use user's food budget if provided, otherwise ask for it
+            if food_budget is not None:
+                estimated_food_cost = food_budget
+            else:
+                # If no food budget provided, use a default and note that user should specify
+                estimated_food_cost = len(route_list) * 40  # Default fallback
+                print("Note: Please specify your food budget for accurate cost calculations")
+            
+            land_based_cost = estimated_fuel_cost + estimated_accommodation_cost + estimated_food_cost
+            
+            # Add flight cost if available
+            flight_cost = flight_costs[0] if flight_costs else 0
+            total_cost = land_based_cost + flight_cost
+            
             # Create itinerary option
             itinerary_option = {
                 'id': i + 1,
@@ -328,7 +377,18 @@ def create_multiple_itineraries(cities: Union[List[str], Dict[str, Any], str]) -
                 'total_distance_km': travel_details.get('total_distance_km', 0),
                 'carbon_emissions_kg': travel_details.get('carbon_emissions_kg', 0),
                 'estimated_drive_time_hours': round(travel_details.get('total_distance_km', 0) / 60, 1),  # Assume 60 km/h average
-                'route_description': ' → '.join(route_list)
+                'route_description': ' → '.join(route_list),
+                'costs': {
+                    'land_based_cost': round(land_based_cost, 2),
+                    'flight_cost': round(flight_cost, 2),
+                    'total_cost': round(total_cost, 2),
+                    'cost_breakdown': {
+                        'fuel': round(estimated_fuel_cost, 2),
+                        'accommodation': round(estimated_accommodation_cost, 2),
+                        'food': round(estimated_food_cost, 2),
+                        'flights': round(flight_cost, 2)
+                    }
+                }
             }
             
             itinerary_options.append(itinerary_option)

@@ -35,9 +35,13 @@ class Config:
     OPENTRIPMAP_API_KEY = os.environ.get('OPENTRIPMAP_API_KEY')
     OPENROUTESERVICE_API_KEY = os.environ.get('OPENROUTESERVICE_API_KEY')
     
-    # AeroDataBox Flight API
+    # AeroDataBox Flight API (Legacy)
     AERODATABOX_API_KEY = os.environ.get('AERODATABOX_API_KEY')
     AERODATABOX_API_HOST = os.environ.get('AERODATABOX_API_HOST')
+    
+    # Amadeus API for Real-time Flight Pricing
+    AMADEUS_API_KEY = os.environ.get('AMADEUS_API_KEY')
+    AMADEUS_API_SECRET = os.environ.get('AMADEUS_API_SECRET')
     
     # CORS settings
     CORS_ORIGINS = os.environ.get('CORS_ORIGINS', '*').split(',')

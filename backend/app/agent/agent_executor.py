@@ -12,7 +12,7 @@ from langchain import hub
 from langchain_core.prompts import MessagesPlaceholder
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 
-from app.agent.tools import get_recommended_cities, get_points_of_interest, calculate_travel_details, save_itinerary, find_flight_options, create_multiple_itineraries
+from app.agent.tools import get_recommended_cities, get_points_of_interest, calculate_travel_details, save_itinerary, find_flight_options, create_multiple_itineraries, get_itinerary
 
 
 def create_travel_agent() -> AgentExecutor:
@@ -31,7 +31,7 @@ def create_travel_agent() -> AgentExecutor:
     )
     
     # Define available tools
-    tools = [get_recommended_cities, get_points_of_interest, calculate_travel_details, save_itinerary, find_flight_options, create_multiple_itineraries]
+    tools = [get_recommended_cities, get_points_of_interest, calculate_travel_details, save_itinerary, find_flight_options, create_multiple_itineraries, get_itinerary]
     
     # Pull the standard ReAct prompt from LangChain Hub
     prompt = hub.pull("hwchase17/react-chat")
@@ -43,8 +43,9 @@ def create_travel_agent() -> AgentExecutor:
 2. **get_points_of_interest**: Find real attractions and landmarks for any city using live OpenTripMap data
 3. **calculate_travel_details**: Calculate total driving distance and carbon emissions between cities using OpenRouteService
 4. **create_multiple_itineraries**: Create multiple itinerary variations with different city orders and carbon calculations
-5. **find_flight_options**: Find flight options from origin city to destination country with carbon impact estimates
-6. **save_itinerary**: Save completed travel plans to the database (use this as the final step when user confirms they're happy with the plan)
+5. **get_itinerary**: Get detailed itineraries with costs for specific points of interest and dates
+6. **find_flight_options**: Find flight options from origin city to destination country with carbon impact estimates
+7. **save_itinerary**: Save completed travel plans to the database (use this as the final step when user confirms they're happy with the plan)
 
 ## WORKFLOW (Country is already selected by user):
 
@@ -60,12 +61,14 @@ def create_travel_agent() -> AgentExecutor:
 - Let the user select their preferred attractions for each city
 
 **Layer 3 - Itinerary Creation:**
+- Ask the user for their food budget for the entire trip (e.g., "What's your food budget for the whole trip?")
 - Use create_multiple_itineraries to generate multiple different itinerary options based on their city selections
-- This will automatically create different city orders/routes and calculate distance and carbon emissions for each
+- This will automatically create different city orders/routes and calculate distance, carbon emissions, and total costs for each
 - Present 3-5 different itinerary options with:
   - Different city orders/routes
   - Total distance and carbon emissions
-  - Estimated travel time
+  - Estimated travel time and total costs
+  - Cost breakdown (flights, accommodation, food, fuel)
   - Key attractions included
 
 **Layer 4 - Flight Planning (Optional):**
@@ -75,6 +78,7 @@ def create_travel_agent() -> AgentExecutor:
 
 **Final Phase:**
 - Present all itinerary options with filters for price and carbon emissions
+- Show cost breakdowns and total costs for each option
 - Let user select their preferred itinerary
 - Offer to save the final selected itinerary
 

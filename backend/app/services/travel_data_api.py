@@ -1,6 +1,6 @@
 """
 Travel data API service for the travel planner application.
-Provides functions for fetching points of interest and calculating distances using free APIs.
+Provides functions for fetching points of interest, calculating distances, and estimating costs using free APIs.
 """
 
 import os
@@ -306,3 +306,5 @@ def fetch_distance_between_cities(cities: List[str]) -> Optional[Dict[str, Any]]
     except Exception as e:
         logger.error(f"Unexpected error calculating distance between cities {cities}: {str(e)}")
         return None
+
+
