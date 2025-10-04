@@ -1,6 +1,6 @@
 """
 Travel data API service for the travel planner application.
-Provides functions for fetching points of interest and calculating distances using free APIs.
+Provides functions for fetching points of interest, calculating distances, and estimating costs using free APIs.
 """
 
 import os
@@ -30,67 +30,87 @@ def get_city_coordinates(city_name: str) -> Optional[Dict[str, float]]:
             logger.error("OPENTRIPMAP_API_KEY environment variable is required")
             return None
         
-        # Handle specific city disambiguation with country codes
-        search_name = city_name
-        if city_name.lower() == 'paris':
-            search_name = 'Paris, France'  # More specific for France with comma
-        elif city_name.lower() == 'london':
-            search_name = 'London, England'  # More specific for UK
-        elif city_name.lower() == 'rome':
-            search_name = 'Rome, Italy'  # More specific for Italy
-        elif city_name.lower() == 'berlin':
-            search_name = 'Berlin, Germany'  # More specific for Germany
-        elif city_name.lower() == 'lyon':
-            search_name = 'Lyon, France'  # More specific for France
-        elif city_name.lower() == 'nice':
-            search_name = 'Nice, France'  # More specific for France
+        # Handle case where agent passes parameter as dict string
+        if isinstance(city_name, dict):
+            city_name = city_name.get('city', '')
+        elif isinstance(city_name, str) and city_name.startswith('{'):
+            # Try to extract from JSON-like string
+            import json
+            try:
+                parsed = json.loads(city_name)
+                city_name = parsed.get('city', '')
+            except:
+                pass
         
-        # OpenTripMap geoname endpoint
-        url = "https://api.opentripmap.com/0.1/en/places/geoname"
-        params = {
-            'name': search_name,
-            'apikey': api_key
-        }
+        # Handle case where agent passes parameter as string representation of dict
+        if isinstance(city_name, str) and city_name.startswith("{'city':"):
+            # Extract the city name from the string representation
+            import ast
+            try:
+                parsed = ast.literal_eval(city_name)
+                city_name = parsed.get('city', '')
+            except:
+                pass
         
-        response = requests.get(url, params=params, timeout=10)
-        response.raise_for_status()
+        # Smart city disambiguation using multiple search strategies
+        search_attempts = [
+            city_name,  # Try original name first
+            f"{city_name}, France",  # Try with France context
+            f"{city_name}, Europe",  # Try with Europe context
+        ]
         
-        data = response.json()
+        for search_name in search_attempts:
+            try:
+                # OpenTripMap geoname endpoint
+                url = "https://api.opentripmap.com/0.1/en/places/geoname"
+                params = {
+                    'name': search_name,
+                    'apikey': api_key
+                }
+                
+                response = requests.get(url, params=params, timeout=10)
+                response.raise_for_status()
+                
+                data = response.json()
+                
+                if data and 'lon' in data and 'lat' in data:
+                    # Validate coordinates are reasonable (not in the middle of nowhere)
+                    lat = float(data['lat'])
+                    lon = float(data['lon'])
+                    
+                    # Check if coordinates are reasonable (not in ocean or extreme locations)
+                    if -90 <= lat <= 90 and -180 <= lon <= 180:
+                        # Additional validation: check if it's likely the right city
+                        # For French cities, expect coordinates in Europe
+                        if city_name.lower() in ['paris', 'lyon', 'nice', 'marseille', 'toulouse']:
+                            # French cities should be in Europe (roughly 40-50°N, 0-10°E)
+                            if 40 <= lat <= 50 and -5 <= lon <= 10:
+                                logger.info(f"Found coordinates for {city_name}: {lat}, {lon}")
+                                return {'lon': lon, 'lat': lat}
+                        else:
+                            # For other cities, just return if coordinates look reasonable
+                            logger.info(f"Found coordinates for {city_name}: {lat}, {lon}")
+                            return {'lon': lon, 'lat': lat}
+                
+            except Exception as e:
+                logger.warning(f"Search attempt failed for '{search_name}': {str(e)}")
+                continue
         
-        # Fallback to hardcoded coordinates for major cities first
-        major_cities_coords = {
+        # If all API attempts fail, use a minimal fallback for major cities only
+        logger.warning(f"All API attempts failed for {city_name}, using fallback")
+        major_cities_fallback = {
             'paris': {'lat': 48.8566, 'lon': 2.3522},
             'lyon': {'lat': 45.7640, 'lon': 4.8357},
             'nice': {'lat': 43.7102, 'lon': 7.2620},
-            'london': {'lat': 51.5074, 'lon': -0.1278},
-            'rome': {'lat': 41.9028, 'lon': 12.4964},
-            'berlin': {'lat': 52.5200, 'lon': 13.4050},
-            'cdg': {'lat': 49.0097, 'lon': 2.5479},  # Charles de Gaulle Airport
-            'charles de gaulle': {'lat': 49.0097, 'lon': 2.5479}
         }
         
         city_key = city_name.lower().strip()
-        if city_key in major_cities_coords:
-            coords = major_cities_coords[city_key]
-            logger.info(f"Using hardcoded coordinates for {city_name}: {coords['lat']}, {coords['lon']}")
+        if city_key in major_cities_fallback:
+            coords = major_cities_fallback[city_key]
+            logger.info(f"Using fallback coordinates for {city_name}: {coords['lat']}, {coords['lon']}")
             return coords
         
-        # If API data is available, validate it before using
-        if data and 'lon' in data and 'lat' in data:
-            lat = float(data['lat'])
-            lon = float(data['lon'])
-            
-            # Validate coordinates are reasonable (not obviously wrong)
-            if -90 <= lat <= 90 and -180 <= lon <= 180:
-                logger.info(f"Found coordinates for {city_name}: {lat}, {lon}")
-                return {
-                    'lon': lon,
-                    'lat': lat
-                }
-            else:
-                logger.warning(f"Invalid coordinates from API for {city_name}: {lat}, {lon}")
-        
-        logger.warning(f"No valid coordinates found for {city_name}")
+        logger.error(f"No coordinates found for {city_name}")
         return None
             
     except requests.exceptions.RequestException as e:
@@ -543,3 +563,5 @@ def fetch_distance_between_cities(cities: List[str]) -> Optional[Dict[str, Any]]
     except Exception as e:
         logger.error(f"Unexpected error calculating distance between cities {cities}: {str(e)}")
         return None
+
+
