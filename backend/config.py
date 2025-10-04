@@ -31,8 +31,9 @@ class Config:
     RAPIDAPI_KEY = os.environ.get('RAPIDAPI_KEY')
     RAPIDAPI_HOST = os.environ.get('RAPIDAPI_HOST', 'geodb-cities-graphql.p.rapidapi.com')
     
-    # Google Maps settings
-    GOOGLE_MAPS_API_KEY = os.environ.get('GOOGLE_MAPS_API_KEY')
+    # Free Travel APIs
+    OPENTRIPMAP_API_KEY = os.environ.get('OPENTRIPMAP_API_KEY')
+    OPENROUTESERVICE_API_KEY = os.environ.get('OPENROUTESERVICE_API_KEY')
     
     # CORS settings
     CORS_ORIGINS = os.environ.get('CORS_ORIGINS', '*').split(',')

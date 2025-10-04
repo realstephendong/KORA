@@ -11,7 +11,7 @@ from langchain import hub
 from langchain_core.prompts import MessagesPlaceholder
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 
-from app.agent.tools import get_recommended_cities, get_points_of_interest
+from app.agent.tools import get_recommended_cities, get_points_of_interest, calculate_travel_details, save_itinerary
 
 
 def create_travel_agent() -> AgentExecutor:
@@ -30,10 +30,34 @@ def create_travel_agent() -> AgentExecutor:
     )
     
     # Define available tools
-    tools = [get_recommended_cities, get_points_of_interest]
+    tools = [get_recommended_cities, get_points_of_interest, calculate_travel_details, save_itinerary]
     
     # Pull the standard ReAct prompt from LangChain Hub
     prompt = hub.pull("hwchase17/react-chat")
+    
+    # Add custom system message to make agent aware of new capabilities
+    system_message = """You are a travel planning assistant with the following capabilities:
+
+1. **get_recommended_cities**: Get top cities for any country
+2. **get_points_of_interest**: Find real attractions and landmarks for any city using live OpenTripMap data
+3. **calculate_travel_details**: Calculate total driving distance and carbon emissions between cities using OpenRouteService
+4. **save_itinerary**: Save completed travel plans to the database (use this as the final step when user confirms they're happy with the plan)
+
+Your workflow should be:
+1. Help users discover cities in their desired country
+2. Find real attractions for each city using live data
+3. Calculate travel logistics (distance, carbon footprint) for the complete route
+4. Present the full itinerary with all details
+5. Ask if they want to save the itinerary, and use save_itinerary if they confirm
+
+Always aim to provide real, up-to-date information and complete travel plans that users can actually execute."""
+    
+    # Add the system message to the prompt
+    if hasattr(prompt, 'messages'):
+        prompt.messages.insert(0, {"role": "system", "content": system_message})
+    else:
+        # For older prompt templates, add system message differently
+        prompt.template = system_message + "\n\n" + prompt.template
     
     # Create the agent using ReAct pattern
     agent = create_react_agent(llm, tools, prompt)

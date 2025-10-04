@@ -1,11 +1,14 @@
 """
 LangChain tools for the travel planner agent.
-Provides tools for fetching city data and points of interest.
+Provides tools for fetching city data, points of interest, calculating travel details, and saving itineraries.
 """
 
 from typing import List, Dict, Any
 from langchain.tools import tool
 from app.services.geo_api import fetch_cities_for_country
+from app.services.travel_data_api import fetch_points_of_interest, fetch_distance_between_cities
+from app.models.itinerary import Itinerary
+from app import db
 
 
 @tool
@@ -29,111 +32,127 @@ def get_recommended_cities(country_name: str) -> List[str]:
 
 
 @tool
-def get_points_of_interest(city: str) -> List[Dict[str, str]]:
+def get_points_of_interest(city: str) -> List[str]:
     """
-    Finds popular points of interest for a given city.
-    Returns a list of attractions with their categories.
+    Finds popular points of interest for a given city using OpenTripMap API.
+    Returns real, live data about attractions and landmarks.
     
     Args:
         city (str): The name of the city to find attractions for
         
     Returns:
-        List[Dict[str, str]]: List of attractions with name and category
+        List[str]: List of attraction names
     """
-    # For now, return hardcoded data based on popular cities
-    # In a real implementation, this would call an attractions API
-    attractions_data = {
-        "paris": [
-            {"name": "Louvre Museum", "category": "Museum"},
-            {"name": "Eiffel Tower", "category": "Landmark"},
-            {"name": "Notre-Dame Cathedral", "category": "Religious Site"},
-            {"name": "Arc de Triomphe", "category": "Monument"},
-            {"name": "Champs-Élysées", "category": "Shopping Street"}
-        ],
-        "london": [
-            {"name": "Big Ben", "category": "Landmark"},
-            {"name": "Tower of London", "category": "Historic Site"},
-            {"name": "British Museum", "category": "Museum"},
-            {"name": "London Eye", "category": "Attraction"},
-            {"name": "Buckingham Palace", "category": "Royal Residence"}
-        ],
-        "new york": [
-            {"name": "Statue of Liberty", "category": "Monument"},
-            {"name": "Central Park", "category": "Park"},
-            {"name": "Times Square", "category": "Landmark"},
-            {"name": "Metropolitan Museum of Art", "category": "Museum"},
-            {"name": "Brooklyn Bridge", "category": "Landmark"}
-        ],
-        "tokyo": [
-            {"name": "Tokyo Skytree", "category": "Observation Tower"},
-            {"name": "Senso-ji Temple", "category": "Temple"},
-            {"name": "Tokyo National Museum", "category": "Museum"},
-            {"name": "Shibuya Crossing", "category": "Landmark"},
-            {"name": "Meiji Shrine", "category": "Shrine"}
-        ],
-        "rome": [
-            {"name": "Colosseum", "category": "Historic Site"},
-            {"name": "Vatican City", "category": "Religious Site"},
-            {"name": "Trevi Fountain", "category": "Fountain"},
-            {"name": "Pantheon", "category": "Historic Site"},
-            {"name": "Roman Forum", "category": "Historic Site"}
-        ],
-        "barcelona": [
-            {"name": "Sagrada Familia", "category": "Church"},
-            {"name": "Park Güell", "category": "Park"},
-            {"name": "Casa Batlló", "category": "Architecture"},
-            {"name": "La Rambla", "category": "Street"},
-            {"name": "Gothic Quarter", "category": "Historic District"}
-        ],
-        "amsterdam": [
-            {"name": "Anne Frank House", "category": "Museum"},
-            {"name": "Van Gogh Museum", "category": "Museum"},
-            {"name": "Rijksmuseum", "category": "Museum"},
-            {"name": "Canal Ring", "category": "Historic Site"},
-            {"name": "Jordaan District", "category": "Neighborhood"}
-        ],
-        "berlin": [
-            {"name": "Brandenburg Gate", "category": "Monument"},
-            {"name": "Berlin Wall Memorial", "category": "Historic Site"},
-            {"name": "Museum Island", "category": "Museum Complex"},
-            {"name": "Checkpoint Charlie", "category": "Historic Site"},
-            {"name": "Pergamon Museum", "category": "Museum"}
-        ],
-        "madrid": [
-            {"name": "Prado Museum", "category": "Museum"},
-            {"name": "Royal Palace", "category": "Palace"},
-            {"name": "Retiro Park", "category": "Park"},
-            {"name": "Puerta del Sol", "category": "Square"},
-            {"name": "Plaza Mayor", "category": "Historic Square"}
-        ],
-        "vienna": [
-            {"name": "Schönbrunn Palace", "category": "Palace"},
-            {"name": "St. Stephen's Cathedral", "category": "Cathedral"},
-            {"name": "Belvedere Palace", "category": "Palace"},
-            {"name": "Hofburg Palace", "category": "Palace"},
-            {"name": "Prater Park", "category": "Park"}
+    try:
+        # Use the OpenTripMap API to fetch real points of interest
+        attractions = fetch_points_of_interest(city)
+        
+        if not attractions:
+            # Fallback to generic suggestions if API fails
+            return [
+                "City Center",
+                "Local Museum", 
+                "Main Square",
+                "Central Park",
+                "Historic District"
+            ]
+        
+        return attractions
+        
+    except Exception as e:
+        print(f"Error fetching points of interest for {city}: {str(e)}")
+        # Return fallback data
+        return [
+            "City Center",
+            "Local Museum",
+            "Main Square", 
+            "Central Park",
+            "Historic District"
         ]
-    }
+
+
+@tool
+def calculate_travel_details(cities: List[str]) -> Dict[str, Any]:
+    """
+    Calculates the total driving distance and estimated carbon emissions for a trip between a list of cities.
+    The cities must be in travel order.
     
-    # Normalize city name for lookup
-    city_key = city.lower().strip()
+    Args:
+        cities (List[str]): List of city names in the order of travel
+        
+    Returns:
+        Dict[str, Any]: Dictionary with total_distance_km and carbon_emissions_kg
+    """
+    try:
+        if len(cities) < 2:
+            return {
+                'total_distance_km': 0,
+                'carbon_emissions_kg': 0,
+                'error': 'Need at least 2 cities to calculate distance'
+            }
+        
+        # Use OpenRouteService API to calculate distances
+        result = fetch_distance_between_cities(cities)
+        
+        if not result:
+            return {
+                'total_distance_km': 0,
+                'carbon_emissions_kg': 0,
+                'error': 'Could not calculate distances between cities'
+            }
+        
+        # Convert distance from meters to kilometers
+        total_distance_km = result.get('total_distance_meters', 0) / 1000
+        
+        # Calculate carbon emissions (0.12 kg CO2 per km for average car)
+        carbon_emissions_kg = total_distance_km * 0.12
+        
+        return {
+            'total_distance_km': round(total_distance_km, 2),
+            'carbon_emissions_kg': round(carbon_emissions_kg, 2),
+            'cities': result.get('cities', cities)
+        }
+        
+    except Exception as e:
+        print(f"Error calculating travel details: {str(e)}")
+        return {
+            'total_distance_km': 0,
+            'carbon_emissions_kg': 0,
+            'error': f'Error calculating distances: {str(e)}'
+        }
+
+
+@tool
+def save_itinerary(user_id: int, itinerary_name: str, cities: List[str], total_distance_km: float, carbon_emissions_kg: float) -> str:
+    """
+    Saves the final, complete itinerary to the database.
+    Use this ONLY when the user has confirmed they are happy with the plan.
+    You must provide all parameters.
     
-    # Check for exact match first
-    if city_key in attractions_data:
-        return attractions_data[city_key]
-    
-    # Check for partial matches
-    for key, attractions in attractions_data.items():
-        if city_key in key or key in city_key:
-            return attractions
-    
-    # Default attractions for unknown cities
-    return [
-        {"name": "City Center", "category": "Downtown"},
-        {"name": "Local Museum", "category": "Museum"},
-        {"name": "Main Square", "category": "Historic Site"},
-        {"name": "Central Park", "category": "Park"},
-        {"name": "Historic District", "category": "Historic Site"}
-    ]
+    Args:
+        user_id (int): ID of the user saving the itinerary
+        itinerary_name (str): Name for the itinerary
+        cities (List[str]): List of cities in the itinerary
+        total_distance_km (float): Total distance in kilometers
+        carbon_emissions_kg (float): Estimated carbon emissions in kg
+        
+    Returns:
+        str: Confirmation message
+    """
+    try:
+        # Create the itinerary in the database
+        itinerary = Itinerary.create_itinerary(
+            user_id=user_id,
+            name=itinerary_name,
+            cities=cities,
+            total_distance_km=total_distance_km,
+            carbon_emissions_kg=carbon_emissions_kg
+        )
+        
+        return f"Successfully saved itinerary '{itinerary_name}' to the database with ID {itinerary.id}"
+        
+    except Exception as e:
+        print(f"Error saving itinerary: {str(e)}")
+        return f"Error saving itinerary: {str(e)}"
 
 
