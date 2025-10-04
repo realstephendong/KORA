@@ -42,7 +42,8 @@ def create_travel_agent() -> AgentExecutor:
 2. **get_points_of_interest**: Find real attractions and landmarks for any city using live OpenTripMap data
 3. **calculate_travel_details**: Calculate total driving distance and carbon emissions between cities using OpenRouteService
 4. **find_flight_options**: Find flight options from origin city to destination country with carbon impact estimates
-5. **save_itinerary**: Save completed travel plans to the database (use this as the final step when user confirms they're happy with the plan)
+5. **get_itinerary**: Get a list of itineraries for a given list of points of interests
+6. **save_itinerary**: Save completed travel plans to the database (use this as the final step when user confirms they're happy with the plan)
 
 Your complete workflow should be:
 1. **First Phase - Land-based Itinerary**: Help users discover cities in their desired country and create a land-based travel plan
@@ -51,9 +52,9 @@ Your complete workflow should be:
 4. **Final Phase**: Present the complete travel plan including both land itinerary and flight options, then ask if they want to save it
 
 IMPORTANT: Always follow this sequence:
-- Start by helping with the land-based itinerary (cities, attractions, driving routes)
-- Only after that's complete, ask for departure city and travel date
+- Ask for departure city and travel date
 - Then search for flights to get there
+- Help with the land-based itinerary (cities, attractions, driving routes, dates)
 - Finally present the complete plan and offer to save it
 
 Always aim to provide real, up-to-date information and complete travel plans that users can actually execute."""

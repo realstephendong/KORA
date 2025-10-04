@@ -7,8 +7,8 @@ from typing import List, Dict, Any
 import logging
 from langchain.tools import tool
 from app.services.geo_api import fetch_cities_for_country
-from app.services.travel_data_api import fetch_points_of_interest, fetch_distance_between_cities
-from app.services.culture_data import fetch_itinerary_list
+from app.services.travel_data_api import fetch_points_of_interest, fetch_distance_between_cities, fetch_hotel_price, fetch_hotels_in_city
+from app.services.culture_data import fetch_itinerary_list, fetch_cultural_insights
 from app.models.itinerary import Itinerary
 from app import db
 
@@ -226,6 +226,29 @@ def save_itinerary(user_id: int, itinerary_name: str, cities: List[str], total_d
         print(f"Error saving itinerary: {str(e)}")
         return f"Error saving itinerary: {str(e)}"
 
+@tool
+def get_hotel_options(city: str) -> List[Dict[str, Any]]:
+    """
+    Finds hotel options for a given city for a specific date.
+    This is a simple tool that the AI can use to search for hotels.
+    """
+    return fetch_hotels_in_city(city)
+
+@tool
+def get_hotel_price(hotel_id: str, check_in_date: str, check_out_date: str, adults: int = 1) -> Dict[str, Any]:
+    """
+    Finds hotel price for a given hotel for a specific date.
+    This is a simple tool that the AI can use to search for hotel prices.
+    """
+    return fetch_hotel_price(hotel_id, check_in_date, check_out_date, adults)
+
+@tool
+def get_cultural_insights(poi: List[str]) -> Dict[str, Any]:
+    """
+    Finds cultural insights for a given point of interest.
+    This is a simple tool that the AI can use to search for cultural insights.
+    """
+    return fetch_cultural_insights(poi)
 
 @tool
 def find_flight_options(origin_city: str, destination_country: str, travel_date: str) -> List[Dict[str, Any]]:
