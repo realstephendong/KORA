@@ -8,6 +8,10 @@ import requests
 from typing import List, Dict, Any, Optional
 import logging
 from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -175,11 +179,11 @@ def fetch_hotels_in_city(city_name: str) -> List[Dict[str, Any]]:
     Returns:
         List[Dict[str, Any]]: List of hotel information dictionaries
     """
+    load_dotenv()
     try:
         # Amadeus API requires both API key and API secret
-        api_key = "jdpWtNPAHBRvyk5IRJGQSNV9eOY03OBk"
-        api_secret = "IxxhoN3b4bPJ9RvY"
-        
+        api_key = os.environ.get('AMADEUS_API_KEY')
+        api_secret = os.environ.get('AMADEUS_SECRET_KEY')
         if not api_key or not api_secret:
             logger.error("AMADEUS_API_KEY and AMADEUS_API_SECRET environment variables are required")
             return []
@@ -312,8 +316,8 @@ def fetch_hotel_price(hotel_id: str, check_in_date: str, check_out_date: str, ad
     """
     try:
         # Amadeus API requires both API key and API secret
-        api_key = "jdpWtNPAHBRvyk5IRJGQSNV9eOY03OBk"
-        api_secret = "IxxhoN3b4bPJ9RvY"
+        api_key = os.environ.get('AMADEUS_API_KEY')
+        api_secret = os.environ.get('AMADEUS_SECRET_KEY')
         
         if not api_key or not api_secret:
             logger.error("AMADEUS_API_KEY and AMADEUS_API_SECRET environment variables are required")

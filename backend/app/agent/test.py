@@ -5,61 +5,119 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '..', '.env'))
 
-from app.services.culture_data import _generate_ai_itineraries
+from app.services.travel_data_api import fetch_hotels_in_city
 
-# Test the _generate_ai_itineraries method with Paris attractions
-poi_list = ["Eiffel Tower", "Louvre Museum", "Notre-Dame Cathedral", "Arc de Triomphe", "Champs-Élysées"]
-start_date = "2025-01-15"
-end_date = "2025-01-17"
-num_days = 3
+# Test the fetch_hotels_in_city method
+print("Testing Hotels in City Fetching...")
+print("=" * 50)
 
-print("Testing AI Itinerary Generation...")
-print(f"Points of Interest: {', '.join(poi_list)}")
-print(f"Trip Duration: {start_date} to {end_date} ({num_days} days)")
-print("=" * 60)
+# Test parameters
+city_name = "Paris"
 
-itineraries = _generate_ai_itineraries(poi_list, num_days, start_date, end_date)
+print(f"City: {city_name}")
+print("=" * 50)
 
-if itineraries:
-    print(f"Successfully Generated {len(itineraries)} Different Itinerary Options!")
-    print("=" * 60)
+# Fetch hotels in the city
+hotels = fetch_hotels_in_city(city_name)
+
+if hotels:
+    print(f"✅ Successfully Found {len(hotels)} Hotels in {city_name}!")
+    print("=" * 50)
     
-    for i, itinerary in enumerate(itineraries, 1):
-        print(f"\n🎯 ITINERARY OPTION {i}:")
+    # Display hotel information
+    for i, hotel in enumerate(hotels, 1):
+        print(f"\n🏨 HOTEL {i}:")
         print("-" * 40)
+        print(f"  🏷️  Name: {hotel.get('name', 'Unknown Hotel')}")
+        print(f"  🆔 Hotel ID: {hotel.get('hotel_id', 'N/A')}")
+        print(f"  📍 Address: {hotel.get('address', 'Address not available')}")
+        print(f"  🏙️  City: {hotel.get('city', city_name)}")
+        print(f"  🌍 Country: {hotel.get('country', 'N/A')}")
+        print(f"  📮 Postal Code: {hotel.get('postal_code', 'N/A')}")
         
-        for day_plan in itinerary:
-            print(f"  {day_plan}")
+        # Display coordinates if available
+        latitude = hotel.get('latitude')
+        longitude = hotel.get('longitude')
+        if latitude and longitude:
+            print(f"  📍 Coordinates: {latitude}, {longitude}")
         
-        print()
+        # Display rating if available
+        rating = hotel.get('rating')
+        if rating and rating != 'Rating not available':
+            print(f"  ⭐ Rating: {rating}")
+        
+        # Display amenities if available
+        amenities = hotel.get('amenities', [])
+        if amenities:
+            print(f"  🛎️  Amenities: {', '.join(amenities[:5])}")  # Show first 5 amenities
+            if len(amenities) > 5:
+                print(f"      ... and {len(amenities) - 5} more")
+        
+        # Display contact information if available
+        contact = hotel.get('contact', {})
+        if contact:
+            print(f"  📞 Contact: {contact}")
+        
+        # Display description if available
+        description = hotel.get('description')
+        if description and description != 'No description available':
+            # Truncate long descriptions
+            if len(description) > 100:
+                description = description[:100] + "..."
+            print(f"  📝 Description: {description}")
+        
+        # Display additional identifiers
+        chain_code = hotel.get('chain_code')
+        iata_code = hotel.get('iata_code')
+        if chain_code:
+            print(f"  🏢 Chain Code: {chain_code}")
+        if iata_code:
+            print(f"  ✈️  IATA Code: {iata_code}")
+        
+        print("  " + "-" * 30)
     
-    print("=" * 60)
-    print("Itinerary Analysis:")
-    print(f"  • Total Options Generated: {len(itineraries)}")
-    print(f"  • Days Covered: {num_days}")
-    print(f"  • Attractions Included: {len(poi_list)}")
+    # Summary statistics
+    print("\n📊 HOTEL SUMMARY:")
+    print("-" * 30)
+    print(f"  🏨 Total Hotels Found: {len(hotels)}")
     
-    # Analyze itinerary diversity
-    all_attractions_used = set()
-    for itinerary in itineraries:
-        for day_plan in itinerary:
-            # Extract attraction names from day plans
-            attractions_in_day = day_plan.split(": ")[1] if ": " in day_plan else day_plan
-            attractions_in_day = attractions_in_day.split(" → ")
-            for attraction in attractions_in_day:
-                attraction = attraction.strip()
-                if attraction:
-                    all_attractions_used.add(attraction)
+    # Analyze hotel data
+    hotels_with_ratings = [h for h in hotels if h.get('rating') and h.get('rating') != 'Rating not available']
+    hotels_with_amenities = [h for h in hotels if h.get('amenities')]
+    hotels_with_coordinates = [h for h in hotels if h.get('latitude') and h.get('longitude')]
     
-    print(f"  • Unique Attractions Used: {len(all_attractions_used)}")
-    print(f"  • Attraction Coverage: {len(all_attractions_used)}/{len(poi_list)} ({len(all_attractions_used)/len(poi_list)*100:.1f}%)")
+    print(f"  ⭐ Hotels with Ratings: {len(hotels_with_ratings)}")
+    print(f"  🛎️  Hotels with Amenities: {len(hotels_with_amenities)}")
+    print(f"  📍 Hotels with Coordinates: {len(hotels_with_coordinates)}")
     
-    if len(all_attractions_used) == len(poi_list):
-        print("  ✅ All attractions are included in the itineraries!")
-    else:
-        missing = set(poi_list) - all_attractions_used
-        print(f"  ⚠️  Missing attractions: {', '.join(missing)}")
+    # Chain analysis
+    chain_codes = [h.get('chain_code') for h in hotels if h.get('chain_code')]
+    if chain_codes:
+        unique_chains = list(set(chain_codes))
+        print(f"  🏢 Hotel Chains: {len(unique_chains)}")
+        for chain in unique_chains[:3]:  # Show top 3 chains
+            count = chain_codes.count(chain)
+            print(f"    • {chain}: {count} hotel(s)")
+    
+    # Country analysis
+    countries = [h.get('country') for h in hotels if h.get('country')]
+    if countries:
+        unique_countries = list(set(countries))
+        print(f"  🌍 Countries: {', '.join(unique_countries)}")
+    
+    print("\n" + "=" * 50)
+    print("✅ Hotels in city fetching test completed successfully!")
     
 else:
-    print("No itineraries generated. Please check your GOOGLE_API_KEY environment variable.")
-    print("Make sure you have a valid Google API key set in your .env file.")
+    print("❌ No hotels found in the city.")
+    print("\nPossible reasons:")
+    print("  • City name not recognized by Amadeus API")
+    print("  • No hotels available in the city")
+    print("  • Amadeus API credentials not configured")
+    print("  • API rate limit exceeded")
+    print("  • Network connectivity issues")
+    print("\nPlease check:")
+    print("  • AMADEUS_API_KEY and AMADEUS_SECRET_KEY in your .env file")
+    print("  • City name is spelled correctly")
+    print("  • City exists in the Amadeus database")
+    print("  • Try a major city like 'Paris', 'London', 'New York'")
