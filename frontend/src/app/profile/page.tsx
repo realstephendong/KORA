@@ -4,7 +4,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { apiClient } from '@/lib/api-client';
 import { useEffect, useState } from 'react';
-import Image from 'next/image';
 
 interface UserProfile {
   id: number;
@@ -29,10 +28,7 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  const [selectedInterests, setSelectedInterests] = useState([
-    "Food & treats",
-    "Learning about Culture",
-  ]);
+  const [selectedInterests, setSelectedInterests] = useState([]);
   const [budgetRange, setBudgetRange] = useState("$000-$0000");
 
   const interests = [
@@ -53,9 +49,7 @@ export default function ProfilePage() {
   const isSelected = (label: string) => selectedInterests.includes(label);
   
   // Profile picture management
-  const profileImages = [
-    '/profile/tree1.svg', 
-    '/profile/tree2.svg',
+  const profileImages = [ 
     '/profile/turtle blue.svg',
     '/profile/turtle green.svg',
     '/profile/turtle pink.svg',
@@ -118,12 +112,11 @@ export default function ProfilePage() {
                   ‹
                 </button>
                 
-                <div className="relative w-32 h-32 bg-gray-100 rounded-full overflow-hidden border-4 border-gray-300">
-                  <Image
-                    src={`/profile/${profileImages[currentImageIndex]}`}
+                <div className="relative w-32 h-32 bg-gray-100 rounded-full overflow-hidden border-4 border-gray-300 flex items-center justify-center">
+                  <img
+                    src={profileImages[currentImageIndex]}
                     alt={`Profile picture ${currentImageIndex + 1}`}
-                    fill
-                    className="object-contain p-2"
+                    className="w-24 h-24 object-contain"
                   />
                 </div>
                 
@@ -140,9 +133,9 @@ export default function ProfilePage() {
                 <p className="text-sm text-gray-600">
                   {currentImageIndex + 1} of {profileImages.length}
                 </p>
-                <p className="text-xs text-gray-500 mt-1">
+                {/* <p className="text-xs text-gray-500 mt-1">
                   {profileImages[currentImageIndex].replace('.svg', '').replace(/([A-Z])/g, ' $1').trim()}
-                </p>
+                </p> */}
               </div>
             </div>
 
