@@ -113,10 +113,11 @@
       .polygonCapColor(() => 'rgba(74, 144, 226, 0.6)')
       .polygonSideColor(() => 'rgba(74, 144, 226, 0.1)')
       .polygonStrokeColor(() => 'rgba(44, 90, 160, 0.8)')
-      .polygonLabel(({ properties: d }) => `
-          <b>${d.ADMIN || d.NAME}</b> <br />
-          <i>Click to explore travel options</i>
-        `);
+      // .polygonLabel(({ properties: d }) => `
+      //     <b>${d.ADMIN || d.NAME}</b> <br />
+      //     <i>Click to explore travel options</i>
+      //   `);
+      .polygonLabel(() => '');
 
     // Auto-rotate
     world.controls().autoRotate = true;
