@@ -232,6 +232,14 @@ const GlobeComponent = forwardRef<GlobeRef, GlobeProps>(({ countriesData, onCoun
             globe.polygonCapColor(() => '#CFDECB');
           }
         });
+
+        // Handle direct clicks on countries
+        globe.onPolygonClick((clickedCountry: any) => {
+          if (clickedCountry && onCountrySelected) {
+            console.log('Country clicked:', clickedCountry.properties.ADMIN || clickedCountry.properties.NAME);
+            onCountrySelected(clickedCountry);
+          }
+        });
         
         // Store globe instance for zoom functionality
         globeRef.current = globe;

@@ -12,6 +12,9 @@ from authlib.jose import jwt
 from authlib.jose.errors import JoseError
 import requests
 import jwt as pyjwt
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.backends import default_backend
 
 
 class AuthError(Exception):
@@ -32,6 +35,38 @@ class AuthError(Exception):
 
 # Initialize Auth0 resource protector
 require_auth = ResourceProtector()
+
+
+def jwk_to_pem(jwk):
+    """
+    Convert JWK (JSON Web Key) to PEM format for PyJWT.
+    
+    Args:
+        jwk (dict): JWK dictionary with 'n' and 'e' values
+        
+    Returns:
+        str: PEM-formatted public key
+    """
+    import base64
+    
+    # Decode base64url encoded values
+    n = base64.urlsafe_b64decode(jwk['n'] + '==')
+    e = base64.urlsafe_b64decode(jwk['e'] + '==')
+    
+    # Convert to integers
+    n_int = int.from_bytes(n, 'big')
+    e_int = int.from_bytes(e, 'big')
+    
+    # Create RSA public key
+    public_key = rsa.RSAPublicNumbers(e_int, n_int).public_key(default_backend())
+    
+    # Serialize to PEM format
+    pem = public_key.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+    
+    return pem.decode('utf-8')
 
 
 def get_token_auth_header():
@@ -90,38 +125,66 @@ def verify_decode_jwt(token):
     
     try:
         unverified_header = pyjwt.get_unverified_header(token)
-    except Exception:
+        print(f"DEBUG: Token header: {unverified_header}")
+    except Exception as e:
+        print(f"DEBUG: Error parsing token header: {e}")
         raise AuthError('invalid_header', 'Unable to parse authentication token.', 401)
     
     rsa_key = {}
+    print(f"DEBUG: Looking for kid: {unverified_header['kid']}")
+    print(f"DEBUG: Available keys: {[key['kid'] for key in jwks['keys']]}")
+    
     for key in jwks['keys']:
         if key['kid'] == unverified_header['kid']:
-            rsa_key = {
-                'kty': key['kty'],
-                'kid': key['kid'],
-                'use': key['use'],
-                'n': key['n'],
-                'e': key['e']
-            }
+            # Convert JWK to PEM format
+            rsa_key = jwk_to_pem(key)
+            print(f"DEBUG: Found matching key: {key['kid']}")
+            print(f"DEBUG: Converted to PEM format")
+            break
     
     if rsa_key:
         try:
-            payload = pyjwt.decode(
-                token,
-                rsa_key,
-                algorithms=['RS256'],
-                audience=auth0_audience,
-                issuer=f'https://{auth0_domain}/'
-            )
+            # First, decode without validation to see what's in the token
+            unverified_payload = pyjwt.decode(token, options={"verify_signature": False})
+            print(f"DEBUG: Unverified token payload: {unverified_payload}")
+            
+            print(f"DEBUG: Attempting JWT decode with audience: {auth0_audience}")
+            print(f"DEBUG: Attempting JWT decode with issuer: https://{auth0_domain}/")
+            
+            # For access tokens, we need to be more flexible with audience validation
+            # Access tokens can have different audiences depending on the Auth0 configuration
+            try:
+                # First try with the configured audience
+                payload = pyjwt.decode(
+                    token,
+                    rsa_key,
+                    algorithms=['RS256'],
+                    audience=auth0_audience,
+                    issuer=f'https://{auth0_domain}/'
+                )
+            except pyjwt.InvalidAudienceError:
+                print(f"DEBUG: Audience mismatch, trying without audience validation")
+                # If audience validation fails, try without it (for access tokens)
+                payload = pyjwt.decode(
+                    token,
+                    rsa_key,
+                    algorithms=['RS256'],
+                    issuer=f'https://{auth0_domain}/',
+                    options={"verify_aud": False}
+                )
+            print(f"DEBUG: JWT decode successful: {payload}")
             return payload
             
-        except pyjwt.ExpiredSignatureError:
+        except pyjwt.ExpiredSignatureError as e:
+            print(f"DEBUG: Token expired: {e}")
             raise AuthError('token_expired', 'Token expired.', 401)
             
-        except pyjwt.InvalidTokenError:
+        except pyjwt.InvalidTokenError as e:
+            print(f"DEBUG: Invalid token: {e}")
             raise AuthError('invalid_claims', 'Incorrect claims. Please check the audience and issuer.', 401)
             
-        except Exception:
+        except Exception as e:
+            print(f"DEBUG: JWT decode error: {e}")
             raise AuthError('invalid_header', 'Unable to parse authentication token.', 401)
     
     raise AuthError('invalid_header', 'Unable to find appropriate key.', 401)

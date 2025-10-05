@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import CountrySearch from '@/components/CountrySearch';
 import TravelModal from '@/components/TravelModal';
+import CountryConfirmationModal from '@/components/CountryConfirmationModal';
 
 // Dynamically import Globe to avoid SSR issues
 const Globe = dynamic(() => import('@/components/Globe'), { ssr: false });
@@ -24,6 +25,9 @@ export default function GlobePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedCountry, setSelectedCountry] = useState<Country | null>(null);
   const [showTravelModal, setShowTravelModal] = useState(false);
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+  const [isSearchSelection, setIsSearchSelection] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
   const globeRef = useRef<any>(null);
   const router = useRouter();
 
@@ -52,15 +56,66 @@ export default function GlobePage() {
 
   const handleCountrySelect = (country: Country) => {
     if (globeRef.current && country) {
-      // Zoom to and pop out the selected country
+      // This is a search-based selection, so we need confirmation
+      setIsSearchSelection(true);
+      setSelectedCountry(country);
       globeRef.current.selectCountry(country);
-      console.log('Selecting and zooming to country:', country.properties.ADMIN || country.properties.NAME);
+      console.log('Search selecting and zooming to country:', country.properties.ADMIN || country.properties.NAME);
+      
+      // Show confirmation modal after zoom completes
+      setTimeout(() => {
+        setShowConfirmationModal(true);
+      }, 2500);
     }
   };
 
   const handleCountrySelected = (country: Country) => {
+    // This is a direct click on the globe, so no confirmation needed
+    setIsSearchSelection(false);
     setSelectedCountry(country);
-    // Don't show modal, just show landmark indicator on globe
+    console.log('Direct click on country:', country.properties.ADMIN || country.properties.NAME);
+    
+    // Store the country and transition immediately
+    storeSelectedCountry(country);
+    transitionToWhitePage();
+  };
+
+  const storeSelectedCountry = (country: Country) => {
+    // Store the selected country in localStorage for backend communication
+    const countryData = {
+      name: country.properties.ADMIN || country.properties.NAME,
+      isoCode: country.properties.ISO_A2,
+      selectedAt: new Date().toISOString()
+    };
+    localStorage.setItem('selectedCountry', JSON.stringify(countryData));
+    console.log('Stored country for backend:', countryData);
+  };
+
+  const transitionToWhitePage = () => {
+    setIsTransitioning(true);
+    
+    // Add a smooth transition effect
+    setTimeout(() => {
+      router.push('/chat');
+    }, 1000);
+  };
+
+  const handleConfirmCountry = () => {
+    if (selectedCountry) {
+      setShowConfirmationModal(false);
+      storeSelectedCountry(selectedCountry);
+      transitionToWhitePage();
+    }
+  };
+
+  const handleCancelCountry = () => {
+    setShowConfirmationModal(false);
+    setSelectedCountry(null);
+    setIsSearchSelection(false);
+    // Reset globe view
+    if (globeRef.current) {
+      globeRef.current.pointOfView({ altitude: 1.8 }, 2000);
+    }
   };
 
   const handleTravel = () => {
@@ -94,7 +149,7 @@ export default function GlobePage() {
   return (
     <div className="relative w-full h-screen overflow-hidden bg-white">
       {/* Background Globe */}
-      <div className="absolute inset-0 z-0">
+      <div className={`absolute inset-0 z-0 transition-all duration-1000 ${isTransitioning ? 'opacity-0 scale-110' : 'opacity-100 scale-100'}`}>
         <Globe 
           ref={globeRef} 
           countriesData={countriesData} 
@@ -110,7 +165,23 @@ export default function GlobePage() {
         />
       </div>
 
-      {/* Travel Modal - Removed, using landmark indicator instead */}
+      {/* Country Confirmation Modal */}
+      <CountryConfirmationModal
+        country={selectedCountry!}
+        onConfirm={handleConfirmCountry}
+        onCancel={handleCancelCountry}
+        isVisible={showConfirmationModal}
+      />
+
+      {/* Transition Overlay */}
+      {isTransitioning && (
+        <div className="fixed inset-0 z-50 bg-white flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-xl text-gray-600 font-medium">Preparing your journey...</p>
+          </div>
+        </div>
+      )}
 
     </div>
   );
