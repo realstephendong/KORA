@@ -1,0 +1,26 @@
+@import url('https://fonts.googleapis.com/css2?family=Onest:wght@400;700;800;900&family=Romanesco&display=swap');
+@import "tailwindcss";
+
+
+/* Full-screen layout for the travel planner */
+html,
+  body,
+  #__next {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  overflow: hidden;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+}
+
+/* Responsive design for landing page */
+@media (max-width: 480px) {
+  .landing-container {
+    min-width: 480px;
+    min-height: 316px;
+  }
+}
