@@ -130,43 +130,94 @@ def fetch_cultural_insights(poi: List[str]) -> Dict[str, Any]:
         
         # Create prompt for Gemini to generate cultural insights
         poi_list = ", ".join(poi)
-        prompt = f"""
-        Generate comprehensive cultural insights and travel recommendations for a destination that includes these points of interest: {poi_list}
         
-        Please provide a detailed cultural overview including:
-        1. Historical and cultural significance of the area
-        2. Local customs and etiquette to be aware of
-        3. Best times to visit each attraction
-        4. Local cuisine recommendations
-        5. Transportation tips
-        6. Language and communication tips
-        7. Safety considerations
-        8. Budget-friendly tips
-        9. Hidden gems and local secrets
-        10. Cultural events and festivals (if applicable)
+        # Check if this is a small country/single city destination
+        is_small_destination = len(poi) <= 2 or any(keyword in poi_list.lower() for keyword in [
+            'luxembourg', 'monaco', 'liechtenstein', 'san marino', 'vatican', 'andorra'
+        ])
         
-        Return the response as a JSON object with the following structure:
-        {{
-            "cultural_overview": "Brief overview of the cultural significance",
-            "historical_context": "Historical background of the area",
-            "local_customs": ["custom1", "custom2", "custom3"],
-            "etiquette_tips": ["tip1", "tip2", "tip3"],
-            "best_visit_times": {{
-                "attraction_name": "best time to visit"
-            }},
-            "cuisine_recommendations": ["dish1", "dish2", "restaurant1"],
-            "transportation_tips": ["tip1", "tip2", "tip3"],
-            "language_tips": ["phrase1", "phrase2", "phrase3"],
-            "safety_considerations": ["consideration1", "consideration2"],
-            "budget_tips": ["tip1", "tip2", "tip3"],
-            "hidden_gems": ["gem1", "gem2", "gem3"],
-            "cultural_events": ["event1", "event2"],
-            "recommended_duration": "suggested time to spend",
-            "total_attractions": {len(poi)}
-        }}
-        
-        Make the insights specific to the location and attractions mentioned. Be practical and helpful for travelers.
-        """
+        if is_small_destination:
+            prompt = f"""
+            Generate comprehensive cultural insights and travel recommendations for a small country/single city destination that includes these points of interest: {poi_list}
+            
+            Since this is a compact destination, focus on:
+            1. The unique cultural identity and what makes this place special
+            2. Local customs and etiquette specific to this small nation/city
+            3. Best times to visit and seasonal considerations
+            4. Local cuisine and dining experiences (including traditional dishes and modern fusion)
+            5. Transportation within the destination (walking, public transport, cycling)
+            6. Language and communication tips (including local dialects if applicable)
+            7. Safety considerations and local laws
+            8. Budget-friendly tips for small destinations
+            9. Hidden gems and local secrets that tourists often miss
+            10. Cultural events, festivals, and seasonal activities
+            11. Day trip options to nearby areas if applicable
+            12. Local shopping and artisan experiences
+            
+            Return the response as a JSON object with the following structure:
+            {{
+                "cultural_overview": "Brief overview of the cultural significance and what makes this destination unique",
+                "historical_context": "Historical background of the area and its development",
+                "local_customs": ["custom1", "custom2", "custom3"],
+                "etiquette_tips": ["tip1", "tip2", "tip3"],
+                "best_visit_times": {{
+                    "attraction_name": "best time to visit"
+                }},
+                "cuisine_recommendations": ["dish1", "dish2", "restaurant1"],
+                "transportation_tips": ["tip1", "tip2", "tip3"],
+                "language_tips": ["phrase1", "phrase2", "phrase3"],
+                "safety_considerations": ["consideration1", "consideration2"],
+                "budget_tips": ["tip1", "tip2", "tip3"],
+                "hidden_gems": ["gem1", "gem2", "gem3"],
+                "cultural_events": ["event1", "event2"],
+                "day_trip_options": ["option1", "option2", "option3"],
+                "shopping_recommendations": ["shop1", "shop2", "artisan1"],
+                "recommended_duration": "suggested time to spend (considering it's a compact destination)",
+                "total_attractions": {len(poi)},
+                "destination_type": "small_country_single_city"
+            }}
+            
+            Make the insights specific to this compact destination. Emphasize the unique character and intimate experiences available.
+            """
+        else:
+            prompt = f"""
+            Generate comprehensive cultural insights and travel recommendations for a destination that includes these points of interest: {poi_list}
+            
+            Please provide a detailed cultural overview including:
+            1. Historical and cultural significance of the area
+            2. Local customs and etiquette to be aware of
+            3. Best times to visit each attraction
+            4. Local cuisine recommendations
+            5. Transportation tips
+            6. Language and communication tips
+            7. Safety considerations
+            8. Budget-friendly tips
+            9. Hidden gems and local secrets
+            10. Cultural events and festivals (if applicable)
+            
+            Return the response as a JSON object with the following structure:
+            {{
+                "cultural_overview": "Brief overview of the cultural significance",
+                "historical_context": "Historical background of the area",
+                "local_customs": ["custom1", "custom2", "custom3"],
+                "etiquette_tips": ["tip1", "tip2", "tip3"],
+                "best_visit_times": {{
+                    "attraction_name": "best time to visit"
+                }},
+                "cuisine_recommendations": ["dish1", "dish2", "restaurant1"],
+                "transportation_tips": ["tip1", "tip2", "tip3"],
+                "language_tips": ["phrase1", "phrase2", "phrase3"],
+                "safety_considerations": ["consideration1", "consideration2"],
+                "budget_tips": ["tip1", "tip2", "tip3"],
+                "hidden_gems": ["gem1", "gem2", "gem3"],
+                "cultural_events": ["event1", "event2"],
+                "recommended_duration": "suggested time to spend",
+                "total_attractions": {len(poi)},
+                "destination_type": "multi_city_destination"
+            }}
+            
+            Make the insights specific to the location and attractions mentioned. Be practical and helpful for travelers.
+            """
         
         # Generate response from Gemini
         response = model.generate_content(prompt)

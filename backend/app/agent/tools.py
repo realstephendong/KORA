@@ -52,6 +52,13 @@ def get_recommended_cities(country_name: str) -> List[str]:
             except:
                 pass
         
+        # Handle case where agent passes "country_name: Spain" format
+        if isinstance(country_name, str) and ':' in country_name:
+            # Extract the country name after the colon
+            parts = country_name.split(':', 1)
+            if len(parts) > 1:
+                country_name = parts[1].strip()
+        
         cities = fetch_cities_for_country(country_name)
         return cities if cities else []
     except Exception as e:
@@ -296,11 +303,96 @@ def create_multiple_itineraries(cities: Union[List[str], Dict[str, Any], str], o
         if not isinstance(cities, list):
             cities = []
         
-        if len(cities) < 2:
+        if len(cities) < 1:
             return [{
-                'error': 'Need at least 2 cities to create itineraries',
-                'message': 'Please provide at least 2 cities to create itinerary options'
+                'error': 'Need at least 1 city to create itineraries',
+                'message': 'Please provide at least 1 city to create itinerary options'
             }]
+        
+        # Handle single city case
+        if len(cities) == 1:
+            single_city = cities[0]
+            
+            # Calculate basic costs for single city
+            estimated_accommodation_cost = 3 * 100  # 3 nights at $100/night
+            estimated_food_cost = food_budget if food_budget is not None else 200  # Use provided budget or default
+            estimated_transport_cost = 50  # Local transport within city
+            
+            # Add flight cost if available
+            flight_cost = flight_costs[0] if flight_costs else 0
+            total_cost = estimated_accommodation_cost + estimated_food_cost + estimated_transport_cost + flight_cost
+            
+            # Create single city itinerary options with different day plans
+            single_city_options = [
+                {
+                    'id': 1,
+                    'name': '2-Day Explorer',
+                    'cities': cities,
+                    'total_distance_km': 0,
+                    'carbon_emissions_kg': 0,
+                    'estimated_drive_time_hours': 0,
+                    'route_description': f'2-day exploration of {single_city}',
+                    'costs': {
+                        'land_based_cost': round(estimated_accommodation_cost + estimated_food_cost + estimated_transport_cost, 2),
+                        'flight_cost': round(flight_cost, 2),
+                        'total_cost': round(total_cost, 2),
+                        'cost_breakdown': {
+                            'accommodation': round(estimated_accommodation_cost, 2),
+                            'food': round(estimated_food_cost, 2),
+                            'local_transport': round(estimated_transport_cost, 2),
+                            'flights': round(flight_cost, 2)
+                        }
+                    },
+                    'duration': '2 days',
+                    'description': 'Perfect for a weekend getaway with key attractions'
+                },
+                {
+                    'id': 2,
+                    'name': '3-Day Immersion',
+                    'cities': cities,
+                    'total_distance_km': 0,
+                    'carbon_emissions_kg': 0,
+                    'estimated_drive_time_hours': 0,
+                    'route_description': f'3-day deep dive into {single_city}',
+                    'costs': {
+                        'land_based_cost': round(estimated_accommodation_cost * 1.5 + estimated_food_cost * 1.5 + estimated_transport_cost * 1.5, 2),
+                        'flight_cost': round(flight_cost, 2),
+                        'total_cost': round(total_cost * 1.5, 2),
+                        'cost_breakdown': {
+                            'accommodation': round(estimated_accommodation_cost * 1.5, 2),
+                            'food': round(estimated_food_cost * 1.5, 2),
+                            'local_transport': round(estimated_transport_cost * 1.5, 2),
+                            'flights': round(flight_cost, 2)
+                        }
+                    },
+                    'duration': '3 days',
+                    'description': 'Ideal for experiencing the city\'s culture and hidden gems'
+                },
+                {
+                    'id': 3,
+                    'name': '4-Day Complete Experience',
+                    'cities': cities,
+                    'total_distance_km': 0,
+                    'carbon_emissions_kg': 0,
+                    'estimated_drive_time_hours': 0,
+                    'route_description': f'4-day comprehensive {single_city} experience',
+                    'costs': {
+                        'land_based_cost': round(estimated_accommodation_cost * 2 + estimated_food_cost * 2 + estimated_transport_cost * 2, 2),
+                        'flight_cost': round(flight_cost, 2),
+                        'total_cost': round(total_cost * 2, 2),
+                        'cost_breakdown': {
+                            'accommodation': round(estimated_accommodation_cost * 2, 2),
+                            'food': round(estimated_food_cost * 2, 2),
+                            'local_transport': round(estimated_transport_cost * 2, 2),
+                            'flights': round(flight_cost, 2)
+                        }
+                    },
+                    'duration': '4 days',
+                    'description': 'Perfect for a thorough exploration with day trips to nearby areas'
+                }
+            ]
+            
+            return single_city_options
         
         # Create different itinerary variations
         import itertools
@@ -327,8 +419,10 @@ def create_multiple_itineraries(cities: Union[List[str], Dict[str, Any], str], o
         else:
             selected_permutations = city_permutations
         
-        # Get flight costs if flight parameters are provided
+        # Initialize flight costs
         flight_costs = []
+        
+        # Get flight costs if flight parameters are provided
         if origin_city and travel_date and destination_country:
             try:
                 # Use the flight API to get real flight costs

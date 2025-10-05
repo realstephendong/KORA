@@ -9,7 +9,7 @@ from app.models.user import User
 from app.models.itinerary import Itinerary
 from app import db
 from app.agent.agent_executor import create_travel_agent, parse_chat_history, invoke_agent_with_history
-from app.agent.tools import get_recommended_cities, get_points_of_interest, calculate_travel_details, save_itinerary, find_flight_options, create_multiple_itineraries, get_itinerary
+from app.agent.tools import get_recommended_cities, get_points_of_interest, calculate_travel_details, save_itinerary, find_flight_options, create_multiple_itineraries
 from functools import partial
 
 # Create API blueprint
@@ -90,21 +90,26 @@ def create_travel_agent_with_user(user_id: int):
             return f"Error saving itinerary: {str(e)}"
     
     # Define available tools with user-specific save_itinerary
-    tools = [get_recommended_cities, get_points_of_interest, calculate_travel_details, save_itinerary_with_user, find_flight_options, create_multiple_itineraries, get_itinerary]
+    tools = [get_recommended_cities, get_points_of_interest, calculate_travel_details, save_itinerary_with_user, find_flight_options, create_multiple_itineraries]
     
     # Pull the standard ReAct prompt from LangChain Hub
     prompt = hub.pull("hwchase17/react-chat")
     
     # Add custom system message to make agent aware of new capabilities
-    system_message = """You are a comprehensive travel planning assistant with the following capabilities:
+    system_message = """You are a travel planning assistant. Help users plan their trips by providing city recommendations and itinerary options.
 
-1. **get_recommended_cities**: Get top cities for any country
-2. **get_points_of_interest**: Find real attractions and landmarks for any city using live OpenTripMap data
-3. **calculate_travel_details**: Calculate total driving distance and carbon emissions between cities using OpenRouteService
-4. **create_multiple_itineraries**: Create multiple itinerary variations with different city orders and carbon calculations
-5. **get_itinerary**: Get detailed itineraries with costs for specific points of interest and dates
-6. **find_flight_options**: Find flight options from origin city to destination country with carbon impact estimates
-7. **save_itinerary**: Save completed travel plans to the database (use this as the final step when user confirms they're happy with the plan)
+## CRITICAL RULES:
+- NEVER mention tool names in your responses
+- NEVER show "Action:" or "Action Input:" in your responses  
+- NEVER mention that you're using tools or APIs
+- Keep responses concise and natural
+- If you get stuck, ask a simple question to move forward
+- Focus on travel recommendations, not technical details
+
+## IMPORTANT: Always follow the ReAct pattern correctly:
+- After "Thought:", you MUST include "Action:" and "Action Input:"
+- If you don't need to use a tool, end with "Final Answer:"
+- Never leave "Thought:" without a follow-up action
 
 ## INITIAL WORKFLOW (Country is already selected by user):
 
@@ -116,29 +121,29 @@ When a user says "I want to visit [COUNTRY]", you should:
 4. Ask about their travel style: "What type of experience are you looking for? (cultural, adventure, relaxation, etc.)"
 
 **Layer 1 - City Discovery:**
-- Use get_recommended_cities to suggest top cities in that country
-- Let the user choose 3-5 cities they're interested in
+- Suggest top cities in that country
+- Let the user choose cities they're interested in (even if just one city)
 
 **Layer 2 - Attraction Discovery:**
 - For each selected city, ask: "What places do you want to visit in [CITY]?"
-- Use get_points_of_interest to suggest real attractions and landmarks
+- Suggest real attractions and landmarks
 - Let the user select their preferred attractions for each city
 
 **Layer 3 - Itinerary Creation:**
-- Ask the user for their food budget for the entire trip (e.g., "What's your food budget for the whole trip?")
-- Use create_multiple_itineraries to generate multiple different itinerary options based on their city selections
-- This will automatically create different city orders/routes and calculate distance, carbon emissions, and total costs for each
-- Present 3-5 different itinerary options with:
-  - Different city orders/routes
-  - Total distance and carbon emissions
+- Ask the user for their food budget for the entire trip
+- Generate itinerary options based on their city selections
+- For single cities: Create a detailed single-city itinerary with multiple day options
+- For multiple cities: Create different city orders/routes with distance and carbon calculations
+- Present itinerary options with:
+  - Different routes (if multiple cities) or day-by-day plans (if single city)
+  - Total distance and carbon emissions (if applicable)
   - Estimated travel time and total costs
   - Cost breakdown (flights, accommodation, food, fuel)
   - Key attractions included
 
 **Layer 4 - Flight Planning (Optional):**
 - Only if user wants to fly to the country, ask for their departure city and travel date
-- Use find_flight_options to find ways to get to their destination country
-- Present flight options with carbon impact
+- Find flight options and present them with carbon impact
 
 **Final Phase:**
 - Present all itinerary options with filters for price and carbon emissions
@@ -150,7 +155,7 @@ IMPORTANT: Always follow this sequence:
 - Start by acknowledging their country choice and asking for dates/origin
 - Then get city recommendations
 - Then get attraction preferences for each city
-- Create multiple itinerary options with calculations
+- Create itinerary options with calculations
 - Present options with filters
 - Only handle flights if user specifically requests them
 - Save the final selected itinerary
@@ -174,7 +179,8 @@ Always aim to provide real, up-to-date information and complete travel plans tha
         verbose=True,
         return_intermediate_steps=True,
         handle_parsing_errors=True,
-        max_iterations=5
+        max_iterations=5,  # Allow enough iterations for proper workflow
+        max_execution_time=30  # Add time limit
     )
     
     return agent_executor

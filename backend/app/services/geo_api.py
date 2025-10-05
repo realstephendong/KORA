@@ -15,7 +15,8 @@ logger = logging.getLogger(__name__)
 
 def fetch_cities_for_country(country_name: str) -> List[str]:
     """
-    Fetches the top 5 most populated cities for a given country using GeoDB Cities REST API.
+    Fetches cities for a given country using GeoDB Cities REST API.
+    For small countries, uses a more flexible approach to get diverse locations.
     
     Args:
         country_name (str): The name of the country to search for cities
@@ -137,7 +138,18 @@ def fetch_cities_for_country(country_name: str) -> List[str]:
             'reunion': 'RE',
             'saint helena': 'SH',
             'ascension island': 'AC',
-            'tristan da cunha': 'TA'
+            'tristan da cunha': 'TA',
+            # Add small countries that need special handling
+            'luxembourg': 'LU',
+            'monaco': 'MC',
+            'liechtenstein': 'LI',
+            'san marino': 'SM',
+            'vatican': 'VA',
+            'andorra': 'AD',
+            'malta': 'MT',
+            'cyprus': 'CY',
+            'iceland': 'IS',
+            'ireland': 'IE'
         }
         
         # Handle both string and dict inputs
@@ -157,14 +169,27 @@ def fetch_cities_for_country(country_name: str) -> List[str]:
             'x-rapidapi-host': rapidapi_host
         }
         
+        # Define small countries that need special handling
+        small_countries = {'LU', 'MC', 'LI', 'SM', 'VA', 'AD', 'MT', 'CY', 'IS', 'IE'}
+        
         # Use the "Find cities" endpoint with countryIds parameter
         cities_url = 'https://wft-geo-db.p.rapidapi.com/v1/geo/cities'
-        cities_params = {
-            'countryIds': country_code,
-            'limit': 5,
-            'sort': '-population',  # Sort by population descending
-            'types': 'CITY'  # Only get cities, not other types
-        }
+        
+        # For small countries, get more cities and use different sorting
+        if country_code in small_countries:
+            cities_params = {
+                'countryIds': country_code,
+                'limit': 10,  # Get more cities for small countries
+                'sort': '-population',  # Still sort by population
+                'types': 'CITY'  # Only get cities, not other types
+            }
+        else:
+            cities_params = {
+                'countryIds': country_code,
+                'limit': 5,
+                'sort': '-population',  # Sort by population descending
+                'types': 'CITY'  # Only get cities, not other types
+            }
         
         # Debug: Log the request details
         logger.info(f"Making API request to: {cities_url}")
@@ -192,6 +217,45 @@ def fetch_cities_for_country(country_name: str) -> List[str]:
             city_name = city.get('name')
             if city_name:
                 cities.append(city_name)
+        
+        # For small countries, if we have very few cities, add some fallback options
+        if country_code in small_countries and len(cities) < 3:
+            # Add some well-known locations for small countries
+            fallback_cities = {
+                'LU': ['Luxembourg City', 'Esch-sur-Alzette', 'Differdange', 'Dudelange', 'Ettelbruck'],
+                'MC': ['Monaco', 'Monte Carlo', 'La Condamine', 'Fontvieille', 'Larvotto'],
+                'LI': ['Vaduz', 'Schaan', 'Triesen', 'Balzers', 'Eschen'],
+                'SM': ['San Marino', 'Borgo Maggiore', 'Serravalle', 'Domagnano', 'Fiorentino'],
+                'AD': ['Andorra la Vella', 'Escaldes-Engordany', 'Encamp', 'Sant Julià de Lòria', 'La Massana'],
+                'MT': ['Valletta', 'Birkirkara', 'Mosta', 'Qormi', 'Żabbar'],
+                'CY': ['Nicosia', 'Limassol', 'Larnaca', 'Paphos', 'Famagusta'],
+                'IS': ['Reykjavik', 'Kópavogur', 'Hafnarfjörður', 'Akureyri', 'Reykjanesbær'],
+                'IE': ['Dublin', 'Cork', 'Limerick', 'Galway', 'Waterford']
+            }
+            
+            if country_code in fallback_cities:
+                # Add fallback cities that aren't already in the list
+                for fallback_city in fallback_cities[country_code]:
+                    if fallback_city not in cities:
+                        cities.append(fallback_city)
+                        if len(cities) >= 5:  # Limit to 5 cities total
+                            break
+        
+        # Ensure we return at least the capital/main city for very small countries
+        if len(cities) == 0:
+            capital_fallback = {
+                'LU': ['Luxembourg City'],
+                'MC': ['Monaco'],
+                'LI': ['Vaduz'],
+                'SM': ['San Marino'],
+                'AD': ['Andorra la Vella'],
+                'MT': ['Valletta'],
+                'CY': ['Nicosia'],
+                'IS': ['Reykjavik'],
+                'IE': ['Dublin']
+            }
+            if country_code in capital_fallback:
+                cities = capital_fallback[country_code]
         
         logger.info(f"Successfully fetched {len(cities)} cities for {country_name}")
         return cities

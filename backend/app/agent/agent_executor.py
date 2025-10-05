@@ -36,46 +36,49 @@ def create_travel_agent() -> AgentExecutor:
     prompt = hub.pull("hwchase17/react-chat")
     
     # Add custom system message to make agent aware of new capabilities
-    system_message = """You are a comprehensive travel planning assistant with the following capabilities:
+    system_message = """You are a travel planning assistant. Help users plan their trips by providing city recommendations and itinerary options.
 
-1. **get_recommended_cities**: Get top cities for any country
-2. **get_points_of_interest**: Find real attractions and landmarks for any city using live OpenTripMap data
-3. **calculate_travel_details**: Calculate total driving distance and carbon emissions between cities using OpenRouteService
-4. **create_multiple_itineraries**: Create multiple itinerary variations with different city orders and carbon calculations
-5. **get_hotel_options**: Get hotel options for a given city for a specific date
-6. **get_hotel_price**: Get hotel price for a given hotel for a specific date
-7. **get_cultural_insights**: Get cultural insights for a given point of interest
-8. **find_flight_options**: Find flight options from origin city to destination country with carbon impact estimates
-9. **save_itinerary**: Save completed travel plans to the database (use this as the final step when user confirms they're happy with the plan)
+## CRITICAL RULES:
+- NEVER mention tool names in your responses
+- NEVER show "Action:" or "Action Input:" in your responses  
+- NEVER mention that you're using tools or APIs
+- Keep responses concise and natural
+- If you get stuck, ask a simple question to move forward
+- Focus on travel recommendations, not technical details
+
+## IMPORTANT: Always follow the ReAct pattern correctly:
+- After "Thought:", you MUST include "Action:" and "Action Input:"
+- If you don't need to use a tool, end with "Final Answer:"
+- Never leave "Thought:" without a follow-up action
 
 ## WORKFLOW (Country is already selected by user):
 
 **Layer 1 - City Discovery:**
 - The user has already selected a country (this is given context)
 - Ask: "What cities do you want to visit in [COUNTRY]?" 
-- Use get_recommended_cities to suggest top cities in that country
-- Let the user choose 3-5 cities they're interested in
+- Suggest top cities in that country
+- Let the user choose cities they're interested in (even if just one city)
 
 **Layer 2 - Attraction Discovery:**
 - For each selected city, ask: "What places do you want to visit in [CITY]?"
-- Use get_points_of_interest to suggest real attractions and landmarks
+- Suggest real attractions and landmarks
 - Let the user select their preferred attractions for each city
 
 **Layer 3 - Itinerary Creation:**
-- Ask the user for their food budget for the entire trip (e.g., "What's your food budget for the whole trip?")
-- Use create_multiple_itineraries to generate multiple different itinerary options based on their city selections
-- This will automatically create different city orders/routes and calculate distance, carbon emissions, and total costs for each
-- Present 3-5 different itinerary options with:
-  - Different city orders/routes
-  - Total distance and carbon emissions
+- Ask the user for their food budget for the entire trip
+- Generate itinerary options based on their city selections
+- For single cities: Create a detailed single-city itinerary with multiple day options
+- For multiple cities: Create different city orders/routes with distance and carbon calculations
+- Present itinerary options with:
+  - Different routes (if multiple cities) or day-by-day plans (if single city)
+  - Total distance and carbon emissions (if applicable)
   - Estimated travel time and total costs
   - Cost breakdown (flights, accommodation, food, fuel)
   - Key attractions included
 
 **Layer 4 - Flight Planning (Optional):**
 - Only if user wants to fly to the country, ask for their departure city and travel date
-- Use find_flight_options to find ways to get to their destination country
-- Present flight options with carbon impact
+- Find flight options and present them with carbon impact
 
 **Final Phase:**
 - Present all itinerary options with filters for price and carbon emissions
@@ -86,7 +89,7 @@ def create_travel_agent() -> AgentExecutor:
 IMPORTANT: Always follow this sequence:
 - Start with city recommendations (country is already known)
 - Then get attraction preferences for each city
-- Create multiple itinerary options with calculations
+- Create itinerary options with calculations
 - Present options with filters
 - Only handle flights if user specifically requests them
 - Save the final selected itinerary
@@ -110,8 +113,8 @@ Always aim to provide real, up-to-date information and complete travel plans tha
         verbose=True,
         return_intermediate_steps=True,
         handle_parsing_errors=True,
-        max_iterations=5,
-        early_stopping_method="generate"
+        max_iterations=5,  # Allow enough iterations for proper workflow
+        max_execution_time=30  # Add time limit
     )
     
     return agent_executor
@@ -167,6 +170,27 @@ def invoke_agent_with_history(
         # Invoke the agent with rate limit handling
         result = agent_executor.invoke(input_data)
         
+        # Check if the agent got stuck in a loop or hit iteration limit
+        output_text = str(result.get("output", ""))
+        if ("Agent stopped due to iteration limit" in output_text):
+            return {
+                "output": "I apologize, but I encountered some technical difficulties. Let me help you with a simpler approach. What specific cities or attractions are you most interested in visiting?",
+                "intermediate_steps": [],
+                "success": False,
+                "error": "Agent iteration limit exceeded"
+            }
+        
+        # Check for parsing errors and provide a helpful response
+        if ("Invalid Format: Missing 'Action:'" in output_text and 
+            "Thought:" in output_text and 
+            "Action:" not in output_text):
+            return {
+                "output": "I apologize, but I encountered a technical issue. Let me help you with your travel planning. What specific cities in Spain are you most interested in visiting?",
+                "intermediate_steps": [],
+                "success": False,
+                "error": "ReAct parsing error"
+            }
+        
         return {
             "output": result.get("output", ""),
             "intermediate_steps": result.get("intermediate_steps", []),
@@ -184,6 +208,15 @@ def invoke_agent_with_history(
                 "success": False,
                 "error": "Rate limit exceeded",
                 "rate_limited": True
+            }
+        
+        # Handle iteration limit errors
+        if "iteration limit" in error_msg.lower():
+            return {
+                "output": "I apologize, but I encountered some technical difficulties. Let me help you with a simpler approach. What specific cities or attractions are you most interested in visiting?",
+                "intermediate_steps": [],
+                "success": False,
+                "error": "Agent iteration limit exceeded"
             }
         
         return {
