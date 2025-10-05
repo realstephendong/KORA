@@ -5,6 +5,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
+import { itineraryApi } from '@/lib/api-client';
 
 interface TripInfo {
   icon: string;
@@ -18,153 +20,77 @@ interface DayItinerary {
   description: string;
 }
 
-interface CarbonEmissionsData {
-  carbon_emissions_kg: number;
-  fuel_used_liters: number;
-  distance_km: number;
+interface SavedItinerary {
+  id: number;
+  user_id: number;
+  name: string;
+  cities: string[];
   total_distance_km: number;
-  fuel_rate_liters_per_km: number;
-  stops: number;
-  aircraft_model: string;
-}
-
-interface TreeData {
-  trees_saved: number;
-  trees_needed_to_offset: number;
   carbon_emissions_kg: number;
-  environmental_impact: {
-    plastic_bags_equivalent: number;
-    gasoline_equivalent_gallons: number;
-    coal_electricity_equivalent_kwh: number;
-    sustainability_factor: number;
+  country?: string;
+  travel_dates?: {
+    departure: string;
+    return: string;
   };
-  flight_details: {
-    aircraft_model: string;
-    origin_city: string;
-    destination_city: string;
-    stops: number;
-    distance_km: number;
-    total_distance_km: number;
+  duration_days?: number;
+  attractions?: {
+    [city: string]: string[];
   };
-}
-
-interface PlasticBagData {
-  plastic_bags_saved: number;
-  plastic_bags_needed_to_produce: number;
-  carbon_emissions_kg: number;
-  environmental_impact: {
-    trees_equivalent: number;
-    gasoline_equivalent_gallons: number;
-    coal_electricity_equivalent_kwh: number;
-    sustainability_factor: number;
+  flight_info?: {
+    departure_flight?: any;
+    return_flight?: any;
   };
-  flight_details: {
-    aircraft_model: string;
-    origin_city: string;
-    destination_city: string;
-    stops: number;
-    distance_km: number;
-    total_distance_km: number;
+  estimated_costs?: {
+    flights?: number;
+    hotels?: number;
+    food?: number;
+    total?: number;
   };
+  created_at: string;
+  updated_at: string;
 }
 
 
-export default function ResultPage() {
-  const { user, isLoading } = useAuth();
-  const router = useRouter();
-  const [carbonData, setCarbonData] = useState<CarbonEmissionsData | null>(null);
-  const [treeData, setTreeData] = useState<TreeData | null>(null);
-  const [plasticBagData, setPlasticBagData] = useState<PlasticBagData | null>(null);
+// Trip Info Component
+const TripInfoBar = ({ tripInfoData }: { tripInfoData: TripInfo[] }) => (
+  <div className="flex items-center justify-between px-4 py-3 bg-white rounded-[25px] overflow-hidden border-2 border-gray-200 min-w-[300px] max-w-[500px]">
+    {tripInfoData.map((info, index) => (
+      <div
+        key={index}
+        className="flex items-center gap-2 relative flex-1 justify-center"
+      >
+        <Image
+          className="w-4 h-4 aspect-[1] flex-shrink-0"
+          alt={info.alt}
+          src={info.icon}
+          width={16}
+          height={16}
+        />
+        <div className="font-medium text-black text-sm tracking-[0] leading-[normal] whitespace-nowrap">
+          {info.text}
+        </div>
+      </div>
+    ))}
+  </div>
+);
 
-  const tripInfoData: TripInfo[] = [
-    {
-      icon: "https://c.animaapp.com/7Y4W5hAe/img/location-on@2x.png",
-      text: "France",
-      alt: "Location on",
-    },
-    {
-      icon: "https://c.animaapp.com/7Y4W5hAe/img/map-1@2x.png",
-      text: "Paris, Lyon",
-      alt: "Map",
-    },
-    {
-      icon: "https://c.animaapp.com/7Y4W5hAe/img/map-1@2x.png",
-      text: "5 Days",
-      alt: "Map",
-    },
-  ];
-
-  const itineraryData: DayItinerary[] = [
-    {
-      day: 1,
-      location: "Paris",
-      description:
-        "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. \n\nUt enim ad minim veniam, \nquis nostrud exercitation \nullamco laboris nisi ut aliquip ex ea commodo consequat.\n\nDuis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.",
-    },
-    {
-      day: 2,
-      location: "Paris",
-      description:
-        "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. \n\nUt enim ad minim veniam, \nquis nostrud exercitation \nullamco laboris nisi ut aliquip ex ea commodo consequat.\n\nDuis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.",
-    },
-    {
-      day: 3,
-      location: "Lyon",
-      description:
-        "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. \n\nUt enim ad minim veniam, \nquis nostrud exercitation \nullamco laboris nisi ut aliquip ex ea commodo consequat.\n\nDuis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.",
-    },
-  ];
-
-  const handleBackToGlobe = () => {
-    router.push('/globe');
-  };
-
-  const handleNewSearch = () => {
-    router.push('/chat');
-  };
-
-  const fetchCarbonData = async () => {
-    try {
-      const response = await fetch('/api/carbon-data');
-      if (response.ok) {
-        const data = await response.json();
-        setCarbonData(data);
-      } else {
-        console.error('Failed to fetch carbon data');
-      }
-    } catch (error) {
-      console.error('Error fetching carbon data:', error);
-    }
-  };
-
-  const fetchTreeData = async () => {
-    try {
-      const response = await fetch('/api/tree-data');
-      if (response.ok) {
-        const data = await response.json();
-        setTreeData(data);
-      } else {
-        console.error('Failed to fetch tree data');
-      }
-    } catch (error) {
-      console.error('Error fetching tree data:', error);
-    }
-  };
-
-  const fetchPlasticBagData = async () => {
-    try {
-      const response = await fetch('/api/plastic-bag-data');
-      if (response.ok) {
-        const data = await response.json();
-        setPlasticBagData(data);
-      } else {
-        console.error('Failed to fetch plastic bag data');
-      }
-    } catch (error) {
-      console.error('Error fetching plastic bag data:', error);
-    }
-  };
-
+// Congratulations Section Component
+const CongratulationsSection = ({ 
+  itinerary 
+}: { 
+  itinerary: SavedItinerary | null; 
+}) => {
+  if (!itinerary) {
+    return (
+      <section className="w-full max-w-2xl mx-auto mb-8 rounded-[30px] overflow-hidden border-2 border-solid border-[#d8dfe980] backdrop-blur-sm backdrop-brightness-[100%] [-webkit-backdrop-filter:blur(4px)_brightness(100%)] bg-[rgba(255,255,255,0.2)] relative min-h-[400px]">
+        <div className="p-6 text-center">
+          <div className="text-gray-600 text-lg mb-4">
+            {itinerary === null ? 'Loading your trip data...' : 'No itineraries found'}
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   // Calculate environmental impact metrics
   const calculateEnvironmentalImpact = (emissionsKg: number) => {
@@ -177,14 +103,463 @@ export default function ResultPage() {
     return { treesSaved, plasticBagsSaved };
   };
 
-  // Fetch carbon, tree, and plastic bag data on component mount
-  useEffect(() => {
-    fetchCarbonData();
-    fetchTreeData();
-    fetchPlasticBagData();
-  }, []);
+  const { treesSaved, plasticBagsSaved } = calculateEnvironmentalImpact(itinerary.carbon_emissions_kg);
 
-  if (isLoading) {
+  return (
+  <section className="w-full max-w-2xl mx-auto mb-8 rounded-[30px] overflow-hidden border-2 border-solid border-[#d8dfe980] backdrop-blur-sm backdrop-brightness-[100%] [-webkit-backdrop-filter:blur(4px)_brightness(100%)] bg-[rgba(255,255,255,0.2)] relative min-h-[400px]">
+    <div className="p-6 text-center">
+      <div className="text-gray-600 text-lg mb-4">
+        We&apos;ve calculated your trip!
+      </div>
+
+      <h1 className="text-3xl md:text-4xl font-normal italic text-black mb-8">
+        Congratulations!
+      </h1>
+
+      {/* Bar chart container */}
+      <div className="relative h-48 mb-6 flex items-end justify-center gap-2">
+        {/* Bar chart elements */}
+        <div className="w-7 h-48 bg-white rounded-[23px]" />
+        <div className="w-5 h-20 bg-[#cfdecb] rounded-[23px]" />
+        <div className="w-7 h-48 bg-white rounded-[23px]" />
+        <div className="w-7 h-48 bg-white rounded-[23px]" />
+        <div className="w-5 h-32 bg-[#abc7f0] rounded-[23px]" />
+        <div className="w-5 h-24 bg-[#f1f37e] rounded-[23px]" />
+
+        {/* Icons positioned over bars */}
+        <Image
+          className="absolute bottom-4 left-1/2 transform -translate-x-1/2 w-12 h-12"
+          alt="Tree"
+          src="https://c.animaapp.com/7Y4W5hAe/img/tree2@2x.png"
+          width={48}
+          height={48}
+        />
+
+        <Image
+          className="absolute bottom-8 left-1/2 transform -translate-x-1/2 w-10 h-10"
+          alt="Trash bag"
+          src="https://c.animaapp.com/7Y4W5hAe/img/trash-bag@2x.png"
+          width={40}
+          height={40}
+        />
+      </div>
+
+      <p className="text-gray-600 text-sm md:text-base leading-relaxed">
+        You&apos;ve saved the equivalent of {treesSaved} trees, {plasticBagsSaved.toLocaleString()} plastic bags from
+        polluting the sea, and of course! {itinerary.carbon_emissions_kg.toFixed(0)} kg of CO₂ emissions avoided.
+      </p>
+    </div>
+  </section>
+  );
+};
+
+// Itinerary Section Component
+const ItinerarySection = ({ itinerary }: { itinerary: SavedItinerary | null }) => {
+  if (!itinerary) {
+    return (
+      <section className="w-full max-w-6xl mx-auto mb-8 rounded-[30px] overflow-hidden bg-[rgba(216,223,233,1)] relative">
+        <div className="bg-[#231f20] rounded-t-[30px] p-8 text-center relative">
+          <h2 className="text-3xl md:text-4xl font-normal italic text-[#f6f5fa] mb-2">
+            {itinerary === null ? 'Loading...' : 'No itineraries found'}
+          </h2>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+  <section className="w-full max-w-6xl mx-auto mb-8 rounded-[30px] overflow-hidden bg-[rgba(216,223,233,1)] relative">
+    {/* Header */}
+    <div className="bg-[#231f20] rounded-t-[30px] p-8 text-center relative">
+
+      <h2 className="text-3xl md:text-4xl font-normal italic text-[#f6f5fa] mb-2">
+        {itinerary.name}
+      </h2>
+
+      <div className="text-gray-400 text-lg">
+        {itinerary.cities.join(', ')}
+      </div>
+
+      <Image
+        className="absolute top-4 right-4 w-8 h-8"
+        alt="Turtle pink"
+        src="https://c.animaapp.com/7Y4W5hAe/img/turle-pink@2x.png"
+        width={32}
+        height={32}
+      />
+    </div>
+
+    {/* Itinerary Content */}
+    <div className="bg-[rgba(246,245,250,1)] p-6">
+      <div className="grid gap-6 md:gap-8">
+        {/* Basic Trip Details */}
+        <article className="relative p-6 bg-white rounded-lg shadow-sm border-l-4 border-blue-500">
+          <h3 className="text-xl font-semibold text-gray-800 mb-3">
+            Trip Details
+          </h3>
+          
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <span className="text-gray-600 font-medium">Total Distance:</span>
+              <span className="text-gray-800 font-semibold">{itinerary.total_distance_km.toFixed(1)} km</span>
+            </div>
+            
+            <div className="flex justify-between items-center">
+              <span className="text-gray-600 font-medium">Carbon Emissions:</span>
+              <span className="text-gray-800 font-semibold">{itinerary.carbon_emissions_kg.toFixed(1)} kg CO₂</span>
+            </div>
+            
+            <div className="flex justify-between items-center">
+              <span className="text-gray-600 font-medium">Cities:</span>
+              <span className="text-gray-800 font-semibold">{itinerary.cities.join(' → ')}</span>
+            </div>
+            
+            {itinerary.country && (
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600 font-medium">Country:</span>
+                <span className="text-gray-800 font-semibold">{itinerary.country}</span>
+              </div>
+            )}
+            
+            {itinerary.duration_days && (
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600 font-medium">Duration:</span>
+                <span className="text-gray-800 font-semibold">{itinerary.duration_days} days</span>
+              </div>
+            )}
+            
+            <div className="flex justify-between items-center">
+              <span className="text-gray-600 font-medium">Created:</span>
+              <span className="text-gray-800 font-semibold">
+                {new Date(itinerary.created_at).toLocaleDateString()}
+              </span>
+            </div>
+          </div>
+        </article>
+
+        {/* Travel Dates */}
+        {itinerary.travel_dates && (
+          <article className="relative p-6 bg-white rounded-lg shadow-sm border-l-4 border-green-500">
+            <h3 className="text-xl font-semibold text-gray-800 mb-3">
+              Travel Dates
+            </h3>
+            
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600 font-medium">Departure:</span>
+                <span className="text-gray-800 font-semibold">
+                  {new Date(itinerary.travel_dates.departure).toLocaleDateString()}
+                </span>
+              </div>
+              
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600 font-medium">Return:</span>
+                <span className="text-gray-800 font-semibold">
+                  {new Date(itinerary.travel_dates.return).toLocaleDateString()}
+                </span>
+              </div>
+            </div>
+          </article>
+        )}
+
+        {/* Attractions */}
+        {itinerary.attractions && Object.keys(itinerary.attractions).length > 0 && (
+          <article className="relative p-6 bg-white rounded-lg shadow-sm border-l-4 border-purple-500">
+            <h3 className="text-xl font-semibold text-gray-800 mb-3">
+              Attractions & Points of Interest
+            </h3>
+            
+            <div className="space-y-4">
+              {Object.entries(itinerary.attractions).map(([city, attractions]) => (
+                <div key={city} className="border-l-2 border-gray-200 pl-4">
+                  <h4 className="font-semibold text-gray-700 mb-2">{city}</h4>
+                  <ul className="list-disc list-inside space-y-1">
+                    {attractions.map((attraction, index) => (
+                      <li key={index} className="text-gray-600 text-sm">
+                        {attraction}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </article>
+        )}
+
+        {/* Flight Information */}
+        {itinerary.flight_info && (
+          <article className="relative p-6 bg-white rounded-lg shadow-sm border-l-4 border-orange-500">
+            <h3 className="text-xl font-semibold text-gray-800 mb-3">
+              Flight Information
+            </h3>
+            
+            <div className="space-y-3">
+              {itinerary.flight_info.departure_flight && (
+                <div>
+                  <h4 className="font-semibold text-gray-700 mb-2">Departure Flight</h4>
+                  <div className="text-sm text-gray-600">
+                    {JSON.stringify(itinerary.flight_info.departure_flight, null, 2)}
+                  </div>
+                </div>
+              )}
+              
+              {itinerary.flight_info.return_flight && (
+                <div>
+                  <h4 className="font-semibold text-gray-700 mb-2">Return Flight</h4>
+                  <div className="text-sm text-gray-600">
+                    {JSON.stringify(itinerary.flight_info.return_flight, null, 2)}
+                  </div>
+                </div>
+              )}
+            </div>
+          </article>
+        )}
+
+        {/* Estimated Costs */}
+        {itinerary.estimated_costs && (
+          <article className="relative p-6 bg-white rounded-lg shadow-sm border-l-4 border-red-500">
+            <h3 className="text-xl font-semibold text-gray-800 mb-3">
+              Estimated Costs
+            </h3>
+            
+            <div className="space-y-3">
+              {itinerary.estimated_costs.flights && (
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600 font-medium">Flights:</span>
+                  <span className="text-gray-800 font-semibold">${itinerary.estimated_costs.flights}</span>
+                </div>
+              )}
+              
+              {itinerary.estimated_costs.hotels && (
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600 font-medium">Hotels:</span>
+                  <span className="text-gray-800 font-semibold">${itinerary.estimated_costs.hotels}</span>
+                </div>
+              )}
+              
+              {itinerary.estimated_costs.food && (
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600 font-medium">Food:</span>
+                  <span className="text-gray-800 font-semibold">${itinerary.estimated_costs.food}</span>
+                </div>
+              )}
+              
+              {itinerary.estimated_costs.total && (
+                <div className="flex justify-between items-center border-t pt-3">
+                  <span className="text-gray-800 font-bold">Total:</span>
+                  <span className="text-gray-900 font-bold text-lg">${itinerary.estimated_costs.total}</span>
+                </div>
+              )}
+            </div>
+          </article>
+        )}
+      </div>
+    </div>
+  </section>
+  );
+};
+
+// Navigation Controls Component
+const NavigationControls = ({ 
+  currentIndex,
+  totalItineraries,
+  onPrevious,
+  onNext
+}: { 
+  currentIndex: number;
+  totalItineraries: number;
+  onPrevious: () => void;
+  onNext: () => void;
+}) => {
+  console.log('NavigationControls - totalItineraries:', totalItineraries, 'currentIndex:', currentIndex);
+  
+  if (totalItineraries <= 1) {
+    console.log('NavigationControls - Hiding navigation (only 1 or 0 itineraries)');
+    // Show a debug message when there are no multiple itineraries
+    return (
+      <div className="flex justify-center items-center gap-4 mb-6">
+        <div className="text-sm text-gray-500 italic">
+          {totalItineraries === 0 ? 'No itineraries found' : 'Only 1 itinerary - no navigation needed'}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex justify-center items-center gap-4 mb-6">
+      <button
+        onClick={onPrevious}
+        disabled={currentIndex === 0}
+        className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+          currentIndex === 0 
+            ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+            : 'bg-blue-500 text-white hover:bg-blue-600 hover:scale-110'
+        }`}
+        aria-label="Previous Itinerary"
+      >
+        ←
+      </button>
+      
+      <div className="text-sm text-gray-600 font-medium">
+        {currentIndex + 1} of {totalItineraries}
+      </div>
+      
+      <button
+        onClick={onNext}
+        disabled={currentIndex === totalItineraries - 1}
+        className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+          currentIndex === totalItineraries - 1 
+            ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+            : 'bg-blue-500 text-white hover:bg-blue-600 hover:scale-110'
+        }`}
+        aria-label="Next Itinerary"
+      >
+        →
+      </button>
+    </div>
+  );
+};
+
+// Action Buttons Component
+const ActionButtons = ({ 
+  onBackToGlobe, 
+  onNewSearch 
+}: { 
+  onBackToGlobe: () => void; 
+  onNewSearch: () => void; 
+}) => (
+  <div className="flex justify-center gap-4 mb-8">
+    <button
+      onClick={onBackToGlobe}
+      className="w-12 h-12 bg-transparent border-none cursor-pointer hover:opacity-80 transition-opacity hover:scale-110 transform"
+      aria-label="Back to Globe"
+    >
+      <Image
+        className="w-full h-full"
+        alt="Back to Globe"
+        src="https://c.animaapp.com/7Y4W5hAe/img/group-4@2x.png"
+        width={48}
+        height={48}
+      />
+    </button>
+
+    <button
+      onClick={onNewSearch}
+      className="w-12 h-12 bg-transparent border-none cursor-pointer hover:opacity-80 transition-opacity hover:scale-110 transform"
+      aria-label="New Search"
+    >
+      <Image
+        className="w-full h-full"
+        alt="New Search"
+        src="https://c.animaapp.com/7Y4W5hAe/img/group-5@2x.png"
+        width={48}
+        height={48}
+      />
+    </button>
+  </div>
+);
+
+export default function ResultPage() {
+  const { user, token, isLoading } = useAuth();
+  const router = useRouter();
+  const [itineraries, setItineraries] = useState<SavedItinerary[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  // Get current itinerary
+  const currentItinerary = itineraries[currentIndex] || null;
+
+  const tripInfoData: TripInfo[] = currentItinerary ? [
+    {
+      icon: "https://c.animaapp.com/7Y4W5hAe/img/location-on@2x.png",
+      text: currentItinerary.name,
+      alt: "Location on",
+    },
+    {
+      icon: "https://c.animaapp.com/7Y4W5hAe/img/map-1@2x.png",
+      text: currentItinerary.cities.join(', '),
+      alt: "Map",
+    },
+    {
+      icon: "https://c.animaapp.com/7Y4W5hAe/img/map-1@2x.png",
+      text: `${currentItinerary.total_distance_km.toFixed(0)} km`,
+      alt: "Distance",
+    },
+  ] : [
+    {
+      icon: "https://c.animaapp.com/7Y4W5hAe/img/location-on@2x.png",
+      text: "Loading...",
+      alt: "Location on",
+    },
+    {
+      icon: "https://c.animaapp.com/7Y4W5hAe/img/map-1@2x.png",
+      text: "Loading...",
+      alt: "Map",
+    },
+    {
+      icon: "https://c.animaapp.com/7Y4W5hAe/img/map-1@2x.png",
+      text: "Loading...",
+      alt: "Distance",
+    },
+  ];
+
+
+  const handleBackToGlobe = () => {
+    router.push('/globe');
+  };
+
+  const handleNewSearch = () => {
+    router.push('/chat');
+  };
+
+  const handlePreviousItinerary = () => {
+    if (currentIndex > 0) {
+      setCurrentIndex(currentIndex - 1);
+    }
+  };
+
+  const handleNextItinerary = () => {
+    if (currentIndex < itineraries.length - 1) {
+      setCurrentIndex(currentIndex + 1);
+    }
+  };
+
+  const fetchSavedItineraries = async () => {
+    try {
+      if (!token) {
+        console.error('No token available for API call');
+        setLoading(false);
+        return;
+      }
+      
+      console.log('Fetching all itineraries...');
+      const data = await itineraryApi.getAllItineraries();
+      console.log('Received itineraries data:', data);
+      console.log('Number of itineraries:', data.itineraries?.length || 0);
+      setItineraries(data.itineraries);
+    } catch (error) {
+      console.error('Error fetching saved itineraries:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
+  // Fetch saved itineraries on component mount
+  useEffect(() => {
+    if (token) {
+      // Add a small delay to ensure API client is updated with the token
+      const timeoutId = setTimeout(() => {
+        fetchSavedItineraries();
+      }, 100);
+      
+      return () => clearTimeout(timeoutId);
+    } else {
+      setLoading(false);
+    }
+  }, [token]);
+
+  if (isLoading || loading) {
     return (
       <ProtectedRoute>
         <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
@@ -199,186 +574,73 @@ export default function ResultPage() {
 
   return (
     <ProtectedRoute>
-      <div
-        className="bg-[linear-gradient(0deg,rgba(246,245,250,1)_0%,rgba(246,245,250,1)_100%)] w-full min-w-[1920px] h-[2618px] relative"
-        data-model-id="68:1178"
-      >
+      <main className="min-h-screen bg-[#f6f5fa] relative">
         {/* Main background container */}
-        <div className="absolute top-[39px] left-0 w-[1920px] h-[2579px] rounded-[50px] border-2 border-solid border-[#d8dfe980] bg-[linear-gradient(180deg,rgba(216,223,233,0.25)_0%,rgba(216,223,233,0)_100%),linear-gradient(0deg,rgba(246,245,250,1)_0%,rgba(246,245,250,1)_100%)]" />
+        <div className="absolute inset-4 rounded-[30px] bg-[rgba(216,223,233,0.25)]" />
 
-        {/* Sea turtle logo */}
-        <button
-          onClick={() => router.push('/landing')}
-          className="absolute top-[77px] left-[89px] w-[74px] h-[73px] bg-transparent border-none cursor-pointer"
-        >
-          <img
-            className="w-full h-full"
-            alt="Sea turtle"
-            src="https://c.animaapp.com/7Y4W5hAe/img/sea-turtle-02-2.svg"
-          />
-        </button>
+        {/* Header Section */}
+        <header className="relative z-10 flex items-center justify-between p-6">
+          {/* Sea turtle logo */}
+          <button
+            onClick={() => router.push('/landing')}
+            className="w-12 h-12 bg-transparent border-none cursor-pointer hover:opacity-80 transition-opacity"
+            aria-label="Go to Landing Page"
+          >
+            <Image
+              className="w-full h-full"
+              alt="Sea turtle"
+              src="https://c.animaapp.com/7Y4W5hAe/img/sea-turtle-02-2.svg"
+              width={48}
+              height={48}
+            />
+          </button>
 
-        {/* Trip info bar */}
-        <div className="flex w-[606px] items-center justify-between pl-10 pr-2.5 py-5 absolute top-[82px] left-[659px] bg-white rounded-[40px] overflow-hidden border-[none] before:content-[''] before:absolute before:inset-0 before:p-[5px] before:rounded-[40px] before:[background:linear-gradient(1deg,rgba(238,239,164,0)_0%,rgba(238,239,164,1)_100%)] before:[-webkit-mask:linear-gradient(#fff_0_0)_content-box,linear-gradient(#fff_0_0)] before:[-webkit-mask-composite:xor] before:[mask-composite:exclude] before:z-[1] before:pointer-events-none">
-          {tripInfoData.map((info, index) => (
-            <div
-              key={index}
-              className={`${
-                index === 2 ? "flex w-[138px]" : "inline-flex flex-[0_0_auto]"
-              } items-center gap-2.5 relative`}
-            >
-              <img
-                className="relative w-6 h-6 aspect-[1]"
-                alt={info.alt}
-                src={info.icon}
-              />
-              <div className="relative w-fit mt-[-1.00px] [font-family:'Onest',Helvetica] font-medium text-variable-collection-black text-xl tracking-[0] leading-[normal]">
-                {info.text}
-              </div>
-            </div>
-          ))}
-        </div>
+          {/* Trip info bar */}
+          <TripInfoBar tripInfoData={tripInfoData} />
 
-        {/* Congratulations section */}
-        <div className="absolute top-[251px] left-[648px] w-[607px] h-[855px] rounded-[50px] overflow-hidden border-2 border-solid border-[#d8dfe980] backdrop-blur-sm backdrop-brightness-[100%] [-webkit-backdrop-filter:blur(4px)_brightness(100%)] bg-[linear-gradient(180deg,rgba(216,223,233,0.25)_0%,rgba(216,223,233,0)_100%),linear-gradient(0deg,rgba(255,255,255,0.2)_0%,rgba(255,255,255,0.2)_100%)]">
-          <div className="absolute top-16 left-[77px] w-[454px] [font-family:'Onest',Helvetica] font-medium text-variable-collection-grey text-[25px] text-center tracking-[0] leading-[normal]">
-            We&apos;ve calculated your trip!
-          </div>
+          {/* Settings icon */}
+          <button
+            onClick={() => router.push('/profile')}
+            className="w-10 h-10 bg-transparent border-none cursor-pointer hover:opacity-80 transition-opacity"
+            aria-label="Go to Profile"
+          >
+            <Image
+              className="w-full h-full"
+              alt="Settings"
+              src="https://c.animaapp.com/7Y4W5hAe/img/group-6@2x.png"
+              width={40}
+              height={40}
+            />
+          </button>
+        </header>
 
-          <p className="absolute top-[695px] left-[93px] w-[454px] [font-family:'Onest',Helvetica] font-medium text-variable-collection-grey text-[25px] text-center tracking-[0] leading-[normal]">
-            {treeData && plasticBagData && carbonData ? (
-              <>
-                You&apos;ve saved the equivalent of {treeData.trees_saved.toFixed(0)} trees, {plasticBagData.plastic_bags_saved.toLocaleString()} plastic bags from
-                polluting the sea, and of course! {carbonData.carbon_emissions_kg.toFixed(0)} kg of CO₂ emissions avoided.
-              </>
-            ) : (
-              <>
-                You&apos;ve saved the equivalent of xxx trees, xxx plastic bags from
-                polluting the sea, and of course! xx ...
-              </>
-            )}
-          </p>
-
-          <div className="absolute top-[108px] left-[77px] w-[454px] [font-family:'Libre_Baskerville',Helvetica] font-normal italic text-variable-collection-black text-[50px] text-center tracking-[0] leading-[normal]">
-            Congratulations!
-          </div>
-
-          {/* Bar chart elements */}
-          <div className="top-[234px] left-[186px] w-[45px] h-[397px] bg-white absolute rounded-[38.5px]" />
-          <div className="top-[482px] left-48 w-[33px] h-[142px] bg-[#cfdecb] absolute rounded-[38.5px]" />
-          <div className="top-[234px] left-[281px] w-[45px] h-[397px] bg-white absolute rounded-[38.5px]" />
-          <div className="top-[234px] left-[376px] w-[45px] h-[397px] bg-white absolute rounded-[38.5px]" />
-          <div className="top-[392px] left-[287px] w-[33px] h-[232px] bg-[#abc7f0] absolute rounded-[38.5px]" />
-          <div className="top-[444px] left-[382px] w-[33px] h-[180px] bg-[#f1f37e] absolute rounded-[38.5px]" />
-
-          <img
-            className="absolute top-[436px] left-[169px] w-[85px] h-[91px]"
-            alt="Tree"
-            src="https://c.animaapp.com/7Y4W5hAe/img/tree2@2x.png"
-          />
-
-          <img
-            className="absolute top-[360px] left-[269px] w-[69px] h-[73px]"
-            alt="Trash bag"
-            src="https://c.animaapp.com/7Y4W5hAe/img/trash-bag@2x.png"
-          />
-        </div>
-
-        {/* Itinerary section */}
-        <div className="absolute top-[1242px] left-[469px] w-[961px] h-[1069px] rounded-[50px] overflow-hidden bg-[linear-gradient(195deg,rgba(216,223,233,0)_0%,rgba(216,223,233,1)_100%),linear-gradient(0deg,rgba(246,245,250,1)_0%,rgba(246,245,250,1)_100%)]">
-          <div className="absolute top-0 left-[-57px] w-[2047px] h-[1387px] bg-[#231f20] rounded-[50px] overflow-hidden border border-solid border-black">
-            <img
-              className="absolute top-[214px] left-[122px] w-[832px] h-[3px]"
-              alt="Vector"
-              src="https://c.animaapp.com/7Y4W5hAe/img/vector-6.svg"
+        {/* Main Content */}
+        <div className="relative z-10 px-6 pb-8">
+          <div className="max-w-7xl mx-auto space-y-8">
+            {/* Navigation controls */}
+            <NavigationControls
+              currentIndex={currentIndex}
+              totalItineraries={itineraries.length}
+              onPrevious={handlePreviousItinerary}
+              onNext={handleNextItinerary}
             />
 
-            <div className="absolute top-[100px] left-[474px] w-[165px] [font-family:'Libre_Baskerville',Helvetica] font-normal italic text-[#f6f5fa] text-[50px] tracking-[0] leading-[normal]">
-              France
-            </div>
+            {/* Congratulations section */}
+            <CongratulationsSection 
+              itinerary={currentItinerary}
+            />
 
-            <div className="absolute top-[155px] left-[390px] w-[334px] [font-family:'Onest',Helvetica] font-medium text-variable-collection-grey text-[25px] text-center tracking-[0] leading-[normal]">
-              Paris, Lyon
-            </div>
+            {/* Itinerary section */}
+            <ItinerarySection itinerary={currentItinerary} />
+
+            {/* Action buttons */}
+            <ActionButtons 
+              onBackToGlobe={handleBackToGlobe}
+              onNewSearch={handleNewSearch}
+            />
           </div>
-
-          {itineraryData.map((day, index) => (
-            <p
-              key={index}
-              className={`absolute w-[828px] [font-family:'Onest',Helvetica] font-medium text-variable-collection-white text-[25px] tracking-[0] leading-[normal]`}
-              style={{
-                top: `${247 + index * 334}px`,
-                left: index === 2 ? "66px" : "70px",
-              }}
-            >
-              <span className="text-[#f6f5fa]">
-                Day {day.day} | {day.location}
-                <br />
-              </span>
-
-              <span className="text-[#f6f5fa] text-xl">
-                <br />
-              </span>
-
-              <span className="text-[#a1a1a1] text-xl">
-                {day.description.split("\n").map((line, lineIndex) => (
-                  <React.Fragment key={lineIndex}>
-                    {line}
-                    {lineIndex < day.description.split("\n").length - 1 && <br />}
-                  </React.Fragment>
-                ))}
-              </span>
-            </p>
-          ))}
-
-          <img
-            className="absolute top-[334px] left-[930px] w-1 h-[466px]"
-            alt="Line"
-            src="https://c.animaapp.com/7Y4W5hAe/img/line-2.svg"
-          />
-
-          <img
-            className="absolute w-[6.24%] h-[5.93%] top-[3.32%] left-[49.43%]"
-            alt="Turle pink"
-            src="https://c.animaapp.com/7Y4W5hAe/img/turle-pink@2x.png"
-          />
         </div>
-
-        {/* Action buttons */}
-        <button
-          onClick={handleBackToGlobe}
-          className="absolute top-[2363px] left-[857px] w-[66px] h-[66px] bg-transparent border-none cursor-pointer"
-        >
-          <img
-            className="w-full h-full"
-            alt="Group"
-            src="https://c.animaapp.com/7Y4W5hAe/img/group-4@2x.png"
-          />
-        </button>
-
-        <button
-          onClick={handleNewSearch}
-          className="absolute top-[2363px] left-[981px] w-[66px] h-[66px] bg-transparent border-none cursor-pointer"
-        >
-          <img
-            className="w-full h-full"
-            alt="Group"
-            src="https://c.animaapp.com/7Y4W5hAe/img/group-5@2x.png"
-          />
-        </button>
-
-        {/* Settings icon */}
-        <button
-          onClick={() => router.push('/profile')}
-          className="absolute w-[3.23%] h-[2.37%] top-[2.44%] left-[94.22%] bg-transparent border-none cursor-pointer"
-        >
-          <img
-            className="w-full h-full"
-            alt="Group"
-            src="https://c.animaapp.com/7Y4W5hAe/img/group-6@2x.png"
-          />
-        </button>
-      </div>
+      </main>
     </ProtectedRoute>
   );
 }

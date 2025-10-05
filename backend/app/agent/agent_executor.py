@@ -38,6 +38,14 @@ def create_travel_agent() -> AgentExecutor:
     # Add custom system message with improved prompt engineering
     system_message = """You are a travel planning assistant. You help users plan trips by gathering information and creating itineraries.
 
+## CRITICAL FORMAT REQUIREMENTS
+You MUST follow the ReAct pattern exactly:
+- ALWAYS end responses with either "Action:" or "Final Answer:" 
+- NEVER end with just "Thought:" - this will cause errors
+- If you start with "Thought:", you MUST follow with either "Action:" or "Final Answer:"
+- For simple responses: Thought: [reasoning] → Final Answer: [response]
+- For tool use: Thought: [reasoning] → Action: [tool] → Action Input: [params] → Observation: [result] → Final Answer: [response]
+
 ## CONVERSATION STATE TRACKING
 Track what information you have and what you still need:
 
@@ -52,13 +60,6 @@ Track what information you have and what you still need:
 **OPTIONAL INFO:**
 - Budget: [if provided, use for recommendations]
 - Interests: [if provided, tailor recommendations]
-
-## RESPONSE FORMAT
-- For simple responses: Thought: [reasoning] → Final Answer: [response]
-- For tool use: Thought: [reasoning] → Action: [tool] → Action Input: [params] → Observation: [result] → Final Answer: [response]
-- CRITICAL: ALWAYS end with either "Action:" or "Final Answer:" - never just "Thought:"
-- If you think about something (Thought:), you MUST follow with either Action: or Final Answer:
-- Never leave a response incomplete - always complete the ReAct pattern
 
 ## CONVERSATION FLOW
 1. **Acknowledge country** and ask for travel dates + origin
@@ -108,9 +109,9 @@ Track what information you have and what you still need:
         tools=tools,
         verbose=True,
         return_intermediate_steps=True,
-        handle_parsing_errors=enhanced_parsing_error_handler,  # Use custom error handler
-        max_iterations=3,  # Reduce iterations to prevent loops
-        max_execution_time=20  # Reduce time limit to prevent hanging
+        handle_parsing_errors=True,  # Use custom error handler
+        max_iterations=4000,  # Further reduce iterations to prevent loops
+        max_execution_time=60000,  # Reduce time limit to prevent hanging
     )
     
     return agent_executor

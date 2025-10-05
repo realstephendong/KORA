@@ -103,6 +103,11 @@ export const itineraryApi = {
     return apiClient.get('/api/itineraries');
   },
 
+  // Get the most recently created itinerary for the current user
+  async getLatestItinerary(): Promise<any> {
+    return apiClient.get('/api/latest-itinerary');
+  },
+
   // Get a specific itinerary by ID
   async getItinerary(itineraryId: number): Promise<any> {
     return apiClient.get(`/api/itineraries/${itineraryId}`);
