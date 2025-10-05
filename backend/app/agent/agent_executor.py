@@ -12,8 +12,7 @@ from langchain import hub
 from langchain_core.prompts import MessagesPlaceholder
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 
-from app.agent.tools import get_recommended_cities, get_points_of_interest, calculate_travel_details, save_itinerary, find_flight_options, create_multiple_itineraries, get_itinerary
-
+from app.agent.tools import get_recommended_cities, get_points_of_interest, calculate_travel_details, save_itinerary, find_flight_options, create_multiple_itineraries, get_hotel_options, get_hotel_price, get_cultural_insights
 
 def create_travel_agent() -> AgentExecutor:
     """
@@ -31,7 +30,7 @@ def create_travel_agent() -> AgentExecutor:
     )
     
     # Define available tools
-    tools = [get_recommended_cities, get_points_of_interest, calculate_travel_details, save_itinerary, find_flight_options, create_multiple_itineraries, get_itinerary]
+    tools = [get_recommended_cities, get_points_of_interest, calculate_travel_details, save_itinerary, find_flight_options, create_multiple_itineraries, get_hotel_options, get_hotel_price, get_cultural_insights]
     
     # Pull the standard ReAct prompt from LangChain Hub
     prompt = hub.pull("hwchase17/react-chat")
@@ -43,12 +42,11 @@ def create_travel_agent() -> AgentExecutor:
 2. **get_points_of_interest**: Find real attractions and landmarks for any city using live OpenTripMap data
 3. **calculate_travel_details**: Calculate total driving distance and carbon emissions between cities using OpenRouteService
 4. **create_multiple_itineraries**: Create multiple itinerary variations with different city orders and carbon calculations
-5. **get_itinerary**: Get detailed itineraries with costs for specific points of interest and dates
-6. **get_hotel_options**: Get hotel options for a given city for a specific date
-7. **get_hotel_price**: Get hotel price for a given hotel for a specific date
-8. **get_cultural_insights**: Get cultural insights for a given point of interest
-6. **find_flight_options**: Find flight options from origin city to destination country with carbon impact estimates
-7. **save_itinerary**: Save completed travel plans to the database (use this as the final step when user confirms they're happy with the plan)
+5. **get_hotel_options**: Get hotel options for a given city for a specific date
+6. **get_hotel_price**: Get hotel price for a given hotel for a specific date
+7. **get_cultural_insights**: Get cultural insights for a given point of interest
+8. **find_flight_options**: Find flight options from origin city to destination country with carbon impact estimates
+9. **save_itinerary**: Save completed travel plans to the database (use this as the final step when user confirms they're happy with the plan)
 
 ## WORKFLOW (Country is already selected by user):
 

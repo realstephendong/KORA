@@ -241,6 +241,14 @@ def get_cultural_insights(poi: List[str]) -> Dict[str, Any]:
     return fetch_cultural_insights(poi)
 
 @tool
+def get_events(itinerary: List[str]) -> Dict[str, Any]:
+    """
+    Finds cultural insights for a given point of interest.
+    This is a simple tool that the AI can use to search for cultural insights.
+    """
+    return fetch_cultural_insights(itinerary)
+
+@tool
 def create_multiple_itineraries(cities: Union[List[str], Dict[str, Any], str], origin_city: str = None, travel_date: str = None, destination_country: str = None, food_budget: float = None) -> List[Dict[str, Any]]:
     """
     Creates multiple itinerary variations with different city orders and calculates 
