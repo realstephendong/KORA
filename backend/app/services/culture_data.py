@@ -16,7 +16,97 @@ import json
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+def fetch_events(itinerary: List[str]) -> Dict[str, Any]:
+    """
+    Get events for a given itinerary.
+    """
+    return fetch_events(itinerary)
 
+def fetch_images(places: List[str]) -> Dict[str, Any]:
+    """
+    Get images and place information using Google Places API.
+    
+    Args:
+        places (List[str]): List of places to search for
+        
+    Returns:
+        Dict[str, Any]: Place information with images and details
+    """
+    try:
+        api_key = os.environ.get('GOOGLE_API_KEY')
+        if not api_key:
+            logger.error("GOOGLE_API_KEY environment variable is required")
+            return {}
+        
+        url = "https://places.googleapis.com/v1/places:searchText"
+        headers = {
+            'Content-Type': 'application/json',
+            'X-Goog-Api-Key': api_key,
+            'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.priceLevel,places.photos,places.rating,places.userRatingCount,places.types'
+        }
+        
+        results = {}
+        
+        for place in places:
+            # Create search query for the place
+            search_query = f"{place} tourist attraction"
+            
+            payload = {
+                "textQuery": search_query
+            }
+            
+            logger.info(f"Searching for images and info for: {place}")
+            response = requests.post(url, headers=headers, json=payload, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                if 'places' in data and len(data['places']) > 0:
+                    place_data = data['places'][0]  # Get the first result
+                    
+                    # Extract place information
+                    place_info = {
+                        'name': place_data.get('displayName', {}).get('text', place),
+                        'address': place_data.get('formattedAddress', 'Address not available'),
+                        'price_level': place_data.get('priceLevel', 'Price level not available'),
+                        'rating': place_data.get('rating', 'Rating not available'),
+                        'user_rating_count': place_data.get('userRatingCount', 0),
+                        'types': place_data.get('types', []),
+                        'photos': []
+                    }
+                    
+                    # Process photos if available
+                    if 'photos' in place_data:
+                        for photo in place_data['photos'][:3]:  # Limit to 3 photos
+                            photo_info = {
+                                'name': photo.get('name', ''),
+                                'width_px': photo.get('widthPx', 0),
+                                'height_px': photo.get('heightPx', 0),
+                                'author_attributions': photo.get('authorAttributions', [])
+                            }
+                            place_info['photos'].append(photo_info)
+                    
+                    results[place] = place_info
+                    logger.info(f"Found {len(place_info['photos'])} photos for {place}")
+                else:
+                    logger.warning(f"No places found for: {place}")
+                    results[place] = {'error': 'No places found'}
+            else:
+                logger.error(f"Google Places API error for {place}: {response.status_code} - {response.text}")
+                results[place] = {'error': f'API error: {response.status_code}'}
+        
+        return {
+            'places': results,
+            'total_places_searched': len(places),
+            'successful_searches': len([r for r in results.values() if 'error' not in r])
+        }
+        
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error fetching images from Google Places API: {str(e)}")
+        return {'error': f'Request error: {str(e)}'}
+    except Exception as e:
+        logger.error(f"Unexpected error fetching images: {str(e)}")
+        return {'error': f'Unexpected error: {str(e)}'}
 
 def fetch_cultural_insights(poi: List[str]) -> Dict[str, Any]:
     """

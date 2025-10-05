@@ -4,7 +4,7 @@ from typing import List, Dict, Any, Optional
 import logging as logger
 from dotenv import load_dotenv
 
-from travel_data_api import get_city_coordinates
+from app.services.travel_data_api import get_city_coordinates
 
 load_dotenv()
 
