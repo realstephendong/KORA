@@ -111,6 +111,12 @@ def create_travel_agent_with_user(user_id: int):
 - If you don't need to use a tool, end with "Final Answer:"
 - Never leave "Thought:" without a follow-up action
 
+## USER PROFILE INTEGRATION:
+- If the user has provided their travel budget, use it to ensure all recommendations stay within budget
+- If the user has selected interests (Fashion, Food & treats, Nature & Wildlife, Learning about Culture), tailor recommendations to these preferences
+- DO NOT ask about vacation type or travel style if the user has already provided interests
+- Use the user's interests to suggest relevant attractions and experiences
+
 ## INITIAL WORKFLOW (Country is already selected by user):
 
 **FIRST RESPONSE - Acknowledge Country & Get Basic Info:**
@@ -118,45 +124,47 @@ When a user says "I want to visit [COUNTRY]", you should:
 1. Acknowledge their choice enthusiastically: "Great choice! [COUNTRY] is an amazing destination!"
 2. Ask for their travel dates: "When are you planning to travel? Please provide your departure and return dates."
 3. Ask for their origin: "Where will you be traveling from? (city and country)"
-4. Ask about their travel style: "What type of experience are you looking for? (cultural, adventure, relaxation, etc.)"
-5. Ask for duration: "How many days are you planning to stay? (e.g., 3 days, 1 week, etc.)"
+4. Ask for duration: "How many days are you planning to stay? (e.g., 3 days, 1 week, etc.)"
+5. If user has interests, mention: "I'll make sure to include experiences that match your interests!"
 
 **Layer 1 - City Discovery:**
 - Suggest top cities in that country
+- If user has interests, prioritize cities that offer relevant experiences
 - Let the user choose cities they're interested in (even if just one city)
 
 **Layer 2 - Attraction Discovery:**
 - For each selected city, ask: "What places do you want to visit in [CITY]?"
-- Suggest real attractions and landmarks
+- Suggest real attractions and landmarks that match user interests
 - Let the user select their preferred attractions for each city
 
 **Layer 3 - Itinerary Creation:**
-- Ask the user for their food budget for the entire trip
-- Generate itinerary options based on their city selections
+- Use the user's budget to ensure all recommendations stay within their budget
+- Generate itinerary options based on their city selections and interests
 - For single cities: Create a detailed single-city itinerary with multiple day options
 - For multiple cities: Create different city orders/routes with distance and carbon calculations
 - Present itinerary options with:
   - Different routes (if multiple cities) or day-by-day plans (if single city)
   - Total distance and carbon emissions (if applicable)
-  - Estimated travel time and total costs
+  - Estimated travel time and total costs (ensuring they stay within budget)
   - Cost breakdown (flights, accommodation, food, fuel)
-  - Key attractions included
+  - Key attractions included (tailored to user interests)
 
 **Layer 4 - Flight Planning (Optional):**
 - Only if user wants to fly to the country, ask for their departure city and travel date
 - Find flight options and present them with carbon impact
+- Ensure flight costs fit within the user's budget
 
 **Final Phase:**
 - Present all itinerary options with filters for price and carbon emissions
-- Show cost breakdowns and total costs for each option
+- Show cost breakdowns and total costs for each option (all within budget)
 - Let user select their preferred itinerary
 - Offer to save the final selected itinerary
 
 IMPORTANT: Always follow this sequence:
 - Start by acknowledging their country choice and asking for dates/origin
-- Then get city recommendations
-- Then get attraction preferences for each city
-- Create itinerary options with calculations
+- Then get city recommendations (tailored to interests if available)
+- Then get attraction preferences for each city (matching interests)
+- Create itinerary options with calculations (within budget)
 - Present options with filters
 - Only handle flights if user specifically requests them
 - Save the final selected itinerary
@@ -274,6 +282,84 @@ def get_user_profile():
         }), 500
 
 
+@api_bp.route('/profile', methods=['PUT'])
+@require_auth_decorator
+def update_user_profile():
+    """
+    Update user profile with budget, interests, and profile picture.
+    
+    Expected JSON payload:
+    {
+        "budget": "1000-5000",
+        "interests": ["Fashion", "Food & treats"],
+        "profile_picture": "turtle blue.svg"
+    }
+    
+    Returns:
+        dict: JSON response with updated user profile
+    """
+    try:
+        # Get Auth0 subject from the JWT payload
+        auth0_sub = g.current_user.get('sub')
+        
+        if not auth0_sub:
+            return jsonify({
+                'error': 'invalid_token',
+                'error_description': 'Token does not contain subject identifier'
+            }), 401
+        
+        # Validate request data
+        if not request.is_json:
+            return jsonify({
+                'error': 'invalid_request',
+                'error_description': 'Request must be JSON'
+            }), 400
+        
+        data = request.get_json()
+        
+        # Find user
+        user = User.find_by_auth0_sub(auth0_sub)
+        if not user:
+            return jsonify({
+                'error': 'user_not_found',
+                'error_description': 'User not found'
+            }), 404
+        
+        # Update profile fields
+        import json
+        updated = False
+        
+        if 'budget' in data:
+            user.budget = data['budget']
+            updated = True
+        
+        if 'interests' in data:
+            if isinstance(data['interests'], list):
+                user.interests = json.dumps(data['interests'])
+                updated = True
+        
+        if 'profile_picture' in data:
+            user.profile_picture = data['profile_picture']
+            updated = True
+        
+        if updated:
+            db.session.commit()
+            print(f"DEBUG: Updated profile for user {auth0_sub}")
+        
+        return jsonify({
+            'user': user.to_dict(),
+            'status': 'success',
+            'message': 'Profile updated successfully'
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'error': 'server_error',
+            'error_description': str(e)
+        }), 500
+
+
 @api_bp.route('/chat/message', methods=['POST'])
 @require_auth_decorator
 def chat_message():
@@ -348,10 +434,29 @@ def chat_message():
         # Create the travel agent with user-specific tools
         agent_executor = create_travel_agent_with_user(user.id)
         
+        # Add user profile context to the message
+        profile_context = ""
+        if user.budget:
+            profile_context += f" The user's travel budget is ${user.budget}. "
+        
+        if user.interests:
+            import json
+            try:
+                interests_list = json.loads(user.interests)
+                if interests_list:
+                    interests_str = ", ".join(interests_list)
+                    profile_context += f" The user is interested in: {interests_str}. "
+            except (json.JSONDecodeError, TypeError):
+                pass
+        
         # Add country context to the message if provided
         if country_context:
             country_name = country_context.get('name', 'Unknown')
             user_message = f"I want to visit {country_name}. {user_message}"
+        
+        # Add profile context to the message
+        if profile_context:
+            user_message = f"{profile_context}{user_message}"
         
         # Invoke the agent with the user message and history
         result = invoke_agent_with_history(agent_executor, user_message, chat_history)

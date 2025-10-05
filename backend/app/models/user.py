@@ -31,6 +31,11 @@ class User(db.Model):
     name = db.Column(db.String(255), nullable=True)
     email = db.Column(db.String(255), nullable=True)
     
+    # Profile preferences
+    budget = db.Column(db.String(50), nullable=True)  # User's travel budget
+    interests = db.Column(db.Text, nullable=True)  # JSON string of selected interests
+    profile_picture = db.Column(db.String(255), nullable=True)  # Profile picture path/index
+    
     # Timestamps
     created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
     updated_at = db.Column(db.DateTime, default=db.func.current_timestamp(), 
@@ -47,11 +52,24 @@ class User(db.Model):
         Returns:
             dict: Dictionary representation of the user
         """
+        import json
+        
+        # Parse interests JSON string to list
+        interests_list = []
+        if self.interests:
+            try:
+                interests_list = json.loads(self.interests)
+            except (json.JSONDecodeError, TypeError):
+                interests_list = []
+        
         return {
             'id': self.id,
             'auth0_sub': self.auth0_sub,
             'name': self.name,
             'email': self.email,
+            'budget': self.budget,
+            'interests': interests_list,
+            'profile_picture': self.profile_picture,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
