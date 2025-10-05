@@ -29,6 +29,13 @@ export default function ChatPage() {
   const [selectedCountry, setSelectedCountry] = useState<any>(null);
   const [hasInitialized, setHasInitialized] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [profileImageSrc, setProfileImageSrc] = useState<string | null>(null);
+  const profileImages = [
+    '/assets/turtles/turtle blue.svg',
+    '/assets/turtles/turtle green.svg',
+    '/assets/turtles/turtle pink.svg',
+    '/assets/turtles/turtle purple.svg'
+  ];
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -37,6 +44,29 @@ export default function ChatPage() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Load user's profile image for the header avatar
+  useEffect(() => {
+    const loadProfileImage = async () => {
+      try {
+        const data: any = await apiClient.get('/api/profile');
+        const picture: string | undefined = data?.user?.profile_picture;
+        if (picture) {
+          const imageIndex = profileImages.findIndex(img => img.includes(picture));
+          if (imageIndex !== -1) {
+            setProfileImageSrc(profileImages[imageIndex]);
+          } else {
+            setProfileImageSrc(profileImages[0]);
+          }
+        } else {
+          setProfileImageSrc(profileImages[0]);
+        }
+      } catch (_) {
+        // Silently ignore; fallback image will be used
+      }
+    };
+    loadProfileImage();
+  }, []);
 
   // Initialize chat with country context
   useEffect(() => {
@@ -223,11 +253,14 @@ export default function ChatPage() {
             aria-label="User profile"
             onClick={() => router.push('/profile')}
           >
-            <img
-              className="w-full h-full"
-              alt=""
-              src="https://c.animaapp.com/xia9nwm7/img/group-6@2x.png"
-            />
+            <div className="relative w-full h-full">
+              <div className="absolute inset-0 bg-white border border-[#D8DFE9] rounded-[15px]"></div>
+              <img
+                className="absolute inset-0 m-auto w-4/5 h-4/5 object-contain"
+                alt=""
+                src={profileImageSrc || profileImages[0]} 
+              />
+            </div>
           </button>
         </div>
 
