@@ -15,6 +15,7 @@ export default function SignupPage() {
     password: '',
     confirmPassword: ''
   });
+  const [errors, setErrors] = useState<{[key: string]: string}>({});
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -24,12 +25,48 @@ export default function SignupPage() {
     }));
   };
 
+  const validateForm = () => {
+    const newErrors: {[key: string]: string} = {};
+
+    if (!formData.firstName.trim()) {
+      newErrors.firstName = 'First name is required';
+    }
+
+    if (!formData.lastName.trim()) {
+      newErrors.lastName = 'Last name is required';
+    }
+
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email is required';
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.email = 'Please enter a valid email address';
+    }
+
+    if (!formData.password) {
+      newErrors.password = 'Password is required';
+    } else if (formData.password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters long';
+    }
+
+    if (!formData.confirmPassword) {
+      newErrors.confirmPassword = 'Please confirm your password';
+    } else if (formData.password !== formData.confirmPassword) {
+      newErrors.confirmPassword = 'Passwords do not match';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Note: This form is for UI purposes only
-    // Auth0 handles the actual authentication
-    // Redirect to Auth0 login (same flow for signup)
-    window.location.href = getAuth0LoginUrl();
+    
+    if (validateForm()) {
+      // Note: This form is for UI purposes only
+      // Auth0 handles the actual authentication
+      // Redirect to Auth0 login (same flow for signup)
+      window.location.href = getAuth0LoginUrl();
+    }
   };
 
   if (isLoading) {
@@ -78,8 +115,12 @@ export default function SignupPage() {
                 value={formData.firstName}
                 onChange={handleInputChange}
                 placeholder="Enter your first name"
+                required
                 className="w-full text-[#212121] font-['Onest'] text-xl font-normal leading-normal border-none outline-none bg-transparent placeholder:text-[#A1A1A1]"
               />
+              {errors.firstName && (
+                <span className="text-red-500 text-sm mt-1">{errors.firstName}</span>
+              )}
             </div>
           </div>
 
@@ -95,8 +136,12 @@ export default function SignupPage() {
                 value={formData.lastName}
                 onChange={handleInputChange}
                 placeholder="Enter your last name"
+                required
                 className="w-full text-[#212121] font-['Onest'] text-xl font-normal leading-normal border-none outline-none bg-transparent placeholder:text-[#A1A1A1]"
               />
+              {errors.lastName && (
+                <span className="text-red-500 text-sm mt-1">{errors.lastName}</span>
+              )}
             </div>
           </div>
 
@@ -112,8 +157,12 @@ export default function SignupPage() {
                 value={formData.email}
                 onChange={handleInputChange}
                 placeholder="Enter your email"
+                required
                 className="w-full text-[#212121] font-['Onest'] text-xl font-normal leading-normal border-none outline-none bg-transparent placeholder:text-[#A1A1A1]"
               />
+              {errors.email && (
+                <span className="text-red-500 text-sm mt-1">{errors.email}</span>
+              )}
             </div>
           </div>
 
@@ -128,8 +177,12 @@ export default function SignupPage() {
               value={formData.password}
               onChange={handleInputChange}
               placeholder="Enter your password"
+              required
               className="w-full text-[#212121] font-['Onest'] text-xl font-normal leading-normal border-none outline-none bg-transparent placeholder:text-[#A1A1A1]"
             />
+            {errors.password && (
+              <span className="text-red-500 text-sm mt-1">{errors.password}</span>
+            )}
           </div>
 
           {/* Confirm Password Input */}
@@ -143,8 +196,12 @@ export default function SignupPage() {
               value={formData.confirmPassword}
               onChange={handleInputChange}
               placeholder="Confirm your password"
+              required
               className="w-full text-[#212121] font-['Onest'] text-xl font-normal leading-normal border-none outline-none bg-transparent placeholder:text-[#A1A1A1]"
             />
+            {errors.confirmPassword && (
+              <span className="text-red-500 text-sm mt-1">{errors.confirmPassword}</span>
+            )}
           </div>
 
           {/* Signup Button */}
