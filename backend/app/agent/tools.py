@@ -180,23 +180,6 @@ def calculate_travel_details(cities: Union[List[str], Dict[str, Any], str]) -> D
             'error': f'Error calculating distances: {str(e)}'
         }
 
-@tool
-def get_itinerary(poi: List[str], start_date: str, end_date: str) -> List[List[str]]:
-    """
-    Get a list of itineraries for a given point of interest.
-    Args:
-        poi (List[str]): List of points of interest
-        start_date (str): Start date of the trip
-        end_date (str): End date of the trip
-        
-    Returns:
-        List[List[str]]: List of itineraries
-    """
-    try:
-        return fetch_itinerary_list(poi, start_date, end_date)
-    except Exception as e:
-        print(f"Error getting itinerary: {str(e)}")
-        return []
 
 
 @tool
