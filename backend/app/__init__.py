@@ -38,6 +38,7 @@ def create_app(config_name=None):
     
     # Import models to ensure they are registered with SQLAlchemy
     from app.models.user import User
+    from app.models.itinerary import Itinerary
     
     # Import and register blueprints
     from app.api.routes import api_bp

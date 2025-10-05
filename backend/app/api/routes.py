@@ -698,6 +698,56 @@ def debug_auth():
     }), 200
 
 
+@api_bp.route('/latest-itinerary', methods=['GET'])
+@require_auth_decorator
+def get_latest_itinerary():
+    """
+    Get the most recently created itinerary for the current user.
+    
+    Returns:
+        dict: JSON response with the latest itinerary data
+    """
+    try:
+        # Get Auth0 subject from the JWT payload
+        auth0_sub = g.current_user.get('sub')
+        
+        if not auth0_sub:
+            return jsonify({
+                'error': 'invalid_token',
+                'error_description': 'Token does not contain subject identifier'
+            }), 401
+        
+        # Find user
+        user = User.find_by_auth0_sub(auth0_sub)
+        if not user:
+            return jsonify({
+                'error': 'user_not_found',
+                'error_description': 'User not found'
+            }), 404
+        
+        # Get the most recent itinerary for this user
+        latest_itinerary = Itinerary.query.filter_by(user_id=user.id)\
+            .order_by(Itinerary.created_at.desc())\
+            .first()
+        
+        if not latest_itinerary:
+            return jsonify({
+                'error': 'no_itineraries',
+                'error_description': 'No itineraries found for this user'
+            }), 404
+        
+        return jsonify({
+            'itinerary': latest_itinerary.to_dict(),
+            'status': 'success'
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'error': 'server_error',
+            'error_description': str(e)
+        }), 500
+
+
 @api_bp.route('/health', methods=['GET'])
 def health_check():
     """
