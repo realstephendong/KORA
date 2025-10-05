@@ -74,10 +74,10 @@ export default function ProfilePage() {
   
   // Profile picture management
   const profileImages = [ 
-    '/profile/turtle blue.svg',
-    '/profile/turtle green.svg',
-    '/profile/turtle pink.svg',
-    '/profile/turtle purple.svg'
+    '/assets/turtles/turtle blue.svg',
+    '/assets/turtles/turtle green.svg',
+    '/assets/turtles/turtle pink.svg',
+    '/assets/turtles/turtle purple.svg'
   ];
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
@@ -121,13 +121,13 @@ export default function ProfilePage() {
   return (
     <ProtectedRoute>
       <div className="bg-[linear-gradient(0deg,rgba(246,245,250,1)_0%,rgba(246,245,250,1)_100%)] w-full min-h-screen relative">
-        <main className="max-w-4xl mx-auto py-8 px-4">
-          <div className="bg-white rounded-[50px] border-2 border-solid border-[#d8dfe980] bg-gradient-to-b from-[rgba(216,223,233,0.25)] to-transparent p-8 shadow-lg">
+        <main className="max-w-4xl mx-auto py-4 px-4">
+          <div className="bg-white rounded-[20px] border-2 border-solid border-[#d8dfe980] bg-gradient-to-b from-[rgba(216,223,233,0.25)] to-transparent p-6 shadow-lg">
             
             {/* Profile Picture Selector */}
-            <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold text-gray-800 mb-6">Choose Your Profile Picture</h2>
-              <div className="flex items-center justify-center space-x-4">
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-gray-800 mb-4" style={{fontFamily: 'Onest, sans-serif'}}>Choose Your Profile Picture</h2>
+              <div className="flex items-center space-x-6">
                 <button
                   onClick={prevImage}
                   className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-full transition-colors"
@@ -136,11 +136,11 @@ export default function ProfilePage() {
                   ‹
                 </button>
                 
-                <div className="relative w-32 h-32 bg-gray-100 rounded-full overflow-hidden border-4 border-gray-300 flex items-center justify-center">
+                <div className="relative w-24 h-24 bg-gray-100 rounded-full overflow-hidden border-4 border-gray-300 flex items-center justify-center">
                   <img
                     src={profileImages[currentImageIndex]}
                     alt={`Profile picture ${currentImageIndex + 1}`}
-                    className="w-24 h-24 object-contain"
+                    className="w-16 h-16 object-contain"
                   />
                 </div>
                 
@@ -153,13 +153,10 @@ export default function ProfilePage() {
                 </button>
               </div>
               
-              <div className="text-center mt-4">
+              <div className="mt-3">
                 <p className="text-sm text-gray-600">
                   {currentImageIndex + 1} of {profileImages.length}
                 </p>
-                {/* <p className="text-xs text-gray-500 mt-1">
-                  {profileImages[currentImageIndex].replace('.svg', '').replace(/([A-Z])/g, ' $1').trim()}
-                </p> */}
               </div>
             </div>
 
@@ -172,22 +169,22 @@ export default function ProfilePage() {
 
             {/* Profile Data Display */}
             {profileData && (
-              <div className="bg-gray-50 rounded-lg p-6 mb-6">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">User Information</h3>
+              <div className="bg-gray-50 rounded-lg p-4 mb-6 text-left">
+                <h3 className="text-lg font-semibold text-gray-800 mb-3" style={{fontFamily: 'Onest, sans-serif'}}>User Information</h3>
                 <div className="space-y-2">
-                  <p><span className="font-medium">Name:</span> {profileData.auth0_info.name}</p>
-                  <p><span className="font-medium">Email:</span> {profileData.auth0_info.email}</p>
-                  <p><span className="font-medium">Subject ID:</span> {profileData.auth0_info.sub}</p>
+                  <p className="text-base" style={{fontFamily: 'Onest, sans-serif'}}><span className="font-medium">Name:</span> {profileData.auth0_info.name}</p>
+                  <p className="text-base" style={{fontFamily: 'Onest, sans-serif'}}><span className="font-medium">Email:</span> {profileData.auth0_info.email}</p>
+                  <p className="text-base" style={{fontFamily: 'Onest, sans-serif'}}><span className="font-medium">Subject ID:</span> {profileData.auth0_info.sub}</p>
                 </div>
               </div>
             )}
 
             {/* Budget Section */}
             <div className="mb-6">
-              <label className="block text-xl font-medium text-gray-800 mb-2">
+              <label className="block text-lg font-medium text-gray-800 mb-3" style={{fontFamily: 'Onest, sans-serif'}}>
                 Budget <span className="text-red-500">*</span>
               </label>
-              <div className="flex w-full items-center px-5 py-2.5 bg-white rounded-[20px] border border-gray-300 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-200">
+              <div className="flex w-full max-w-md items-center px-5 py-2.5 bg-white rounded-[20px] border border-gray-300 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-200">
                 <span className="text-gray-500 mr-2">$</span>
                 <input
                   type="text"
@@ -196,17 +193,18 @@ export default function ProfilePage() {
                   onBlur={validateBudget}
                   placeholder="0-00000"
                   className="flex-1 outline-none text-gray-800 placeholder-gray-400"
+                  style={{fontFamily: 'Onest, sans-serif'}}
                   required
                 />
               </div>
               {budgetError && (
-                <p className="text-red-500 text-sm mt-1">{budgetError}</p>
+                <p className="text-red-500 text-sm mt-2">{budgetError}</p>
               )}
             </div>
 
             {/* Interests Section */}
-            <div className="mb-8">
-              <h2 className="text-xl font-medium text-gray-800 mb-4">
+            <div className="mb-6">
+              <h2 className="text-lg font-medium text-gray-800 mb-4" style={{fontFamily: 'Onest, sans-serif'}}>
                 Pick your interests!
               </h2>
               <div className="flex flex-wrap gap-3">
