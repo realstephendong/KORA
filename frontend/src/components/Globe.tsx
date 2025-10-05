@@ -5,6 +5,7 @@ import React, { forwardRef, useImperativeHandle, useEffect, useRef } from 'react
 interface GlobeRef {
   zoomToCountry: (country: any) => void;
   selectCountry: (country: any, isSearchSelection?: boolean) => void;
+  enhancedZoomToCountry: (country: any) => void;
   resumeRotation: () => void;
   resetAppearance: () => void;
   resetView: () => void;
@@ -52,6 +53,39 @@ const GlobeComponent = forwardRef<GlobeRef, GlobeProps>(({ countriesData, onCoun
           
           // Zoom to country
           globeRef.current.pointOfView({ lat: centerLat, lng: centerLng, altitude: 1.5 }, 2000);
+        }
+      }
+    },
+    enhancedZoomToCountry: (country: any) => {
+      if (globeRef.current && country) {
+        // Calculate country center
+        const coordinates = country.geometry.coordinates;
+        let totalLat = 0, totalLng = 0, pointCount = 0;
+        
+        const processCoords = (coords: any) => {
+          if (Array.isArray(coords[0])) {
+            if (typeof coords[0][0] === 'number') {
+              coords.forEach((coord: any) => {
+                if (Array.isArray(coord) && coord.length >= 2) {
+                  totalLng += coord[0];
+                  totalLat += coord[1];
+                  pointCount++;
+                }
+              });
+            } else {
+              coords.forEach((subCoords: any) => processCoords(subCoords));
+            }
+          }
+        };
+        
+        processCoords(coordinates);
+        
+        if (pointCount > 0) {
+          const centerLat = totalLat / pointCount;
+          const centerLng = totalLng / pointCount;
+          
+          // Enhanced zoom with much closer altitude for dramatic transition effect
+          globeRef.current.pointOfView({ lat: centerLat, lng: centerLng, altitude: 0.3 }, 2000);
         }
       }
     },
@@ -162,7 +196,7 @@ const GlobeComponent = forwardRef<GlobeRef, GlobeProps>(({ countriesData, onCoun
     resumeRotation: () => {
       if (globeInstanceRef.current) {
         globeInstanceRef.current.controls().autoRotate = true;
-        globeInstanceRef.current.controls().autoRotateSpeed = 0.2;
+        globeInstanceRef.current.controls().autoRotateSpeed = 0.3;
       }
     },
     resetView: () => {
@@ -260,7 +294,7 @@ const GlobeComponent = forwardRef<GlobeRef, GlobeProps>(({ countriesData, onCoun
 
         // Smooth auto-rotate with gentle speed
         globe.controls().autoRotate = true;
-        globe.controls().autoRotateSpeed = 0.2;
+        globe.controls().autoRotateSpeed = 0.5;
         
         // Enhanced hover effects with smooth transitions
         globe.polygonsTransitionDuration(300);

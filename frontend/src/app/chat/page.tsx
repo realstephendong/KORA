@@ -23,6 +23,8 @@ export default function ChatPage() {
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedCountry, setSelectedCountry] = useState<any>(null);
+  const [hasInitialized, setHasInitialized] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -32,6 +34,63 @@ export default function ChatPage() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Initialize chat with country context
+  useEffect(() => {
+    const initializeChat = async () => {
+      if (hasInitialized) return;
+      
+      try {
+        // Get selected country from localStorage
+        const storedCountry = localStorage.getItem('selectedCountry');
+        if (storedCountry) {
+          const countryData = JSON.parse(storedCountry);
+          setSelectedCountry(countryData);
+          
+          // Send initial message to backend with country context
+          const initialMessage = `I want to visit ${countryData.name}`;
+          
+          setIsLoading(true);
+          const response: ApiResponse = await apiClient.post('/api/chat/message', {
+            message: initialMessage,
+            chat_history: [],
+            country_context: countryData
+          });
+
+          const aiMessage: ChatMessage = {
+            role: 'ai',
+            content: response.response
+          };
+
+          setMessages([aiMessage]);
+          setHasInitialized(true);
+          
+          // Clear the stored country after using it
+          localStorage.removeItem('selectedCountry');
+        } else {
+          // No country selected, show default welcome
+          const welcomeMessage: ChatMessage = {
+            role: 'ai',
+            content: "Welcome to Kora! Please select a country from the globe to start planning your sustainable travel adventure."
+          };
+          setMessages([welcomeMessage]);
+          setHasInitialized(true);
+        }
+      } catch (err) {
+        console.error('Error initializing chat:', err);
+        const errorMessage: ChatMessage = {
+          role: 'ai',
+          content: "Welcome to Kora! I'm here to help you plan your sustainable travel adventure. How can I assist you today?"
+        };
+        setMessages([errorMessage]);
+        setHasInitialized(true);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initializeChat();
+  }, [hasInitialized]);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,8 +132,21 @@ export default function ChatPage() {
           {/* Header */}
           <div className="bg-white shadow-sm border-b border-gray-200 p-4">
             <div className="flex items-center justify-between">
-              <h1 className="text-2xl font-bold text-gray-800">Travel Planning Assistant</h1>
+              <div>
+                <h1 className="text-2xl font-bold text-gray-800">Travel Planning Assistant</h1>
+                {selectedCountry && (
+                  <p className="text-sm text-gray-600 mt-1">
+                    Planning your trip to <span className="font-semibold text-blue-600">{selectedCountry.name}</span>
+                  </p>
+                )}
+              </div>
               <div className="flex gap-2">
+                <a 
+                  href="/itineraries" 
+                  className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  My Trips
+                </a>
                 <a 
                   href="/profile" 
                   className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
