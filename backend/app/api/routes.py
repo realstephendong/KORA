@@ -49,35 +49,54 @@ def create_travel_agent_with_user(user_id: int):
         """Save completed travel plans to the database for the current user."""
         try:
             # Handle case where agent passes all parameters as a single string
-            if isinstance(itinerary_name, str) and ',' in itinerary_name and 'cities=' in itinerary_name:
-                # Parse the combined string that the agent is sending
-                import re
-                import ast
+            if isinstance(itinerary_name, str):
+                # Check if it's a JSON string containing all parameters
+                if itinerary_name.startswith('{') and itinerary_name.endswith('}'):
+                    import json
+                    try:
+                        parsed = json.loads(itinerary_name)
+                        itinerary_name = parsed.get('itinerary_name', itinerary_name)
+                        cities = parsed.get('cities', cities)
+                        total_distance_km = parsed.get('total_distance_km', total_distance_km)
+                        carbon_emissions_kg = parsed.get('carbon_emissions_kg', carbon_emissions_kg)
+                    except json.JSONDecodeError:
+                        pass
                 
-                # Extract itinerary name (everything before the first comma with cities=)
-                name_match = re.search(r'^([^,]+?)(?=, cities=)', itinerary_name)
-                if name_match:
-                    itinerary_name = name_match.group(1).strip()
-                
-                # Extract cities list
-                cities_match = re.search(r"cities=\[([^\]]+)\]", itinerary_name)
-                if cities_match:
-                    cities_str = cities_match.group(1)
-                    cities = [city.strip().strip("'\"") for city in cities_str.split(',')]
-                
-                # Extract total_distance_km
-                distance_match = re.search(r'total_distance_km=([0-9.]+)', itinerary_name)
-                if distance_match:
-                    total_distance_km = float(distance_match.group(1))
-                
-                # Extract carbon_emissions_kg
-                carbon_match = re.search(r'carbon_emissions_kg=([0-9.]+)', itinerary_name)
-                if carbon_match:
-                    carbon_emissions_kg = float(carbon_match.group(1))
+                # Handle case where agent passes parameters in format "itinerary_name=Name, cities=[...]"
+                elif 'itinerary_name=' in itinerary_name and ',' in itinerary_name:
+                    import re
+                    import ast
+                    
+                    # Extract itinerary name (everything after "itinerary_name=" and before the first comma)
+                    name_match = re.search(r'itinerary_name=([^,]+)', itinerary_name)
+                    if name_match:
+                        itinerary_name = name_match.group(1).strip()
+                    
+                    # Extract cities list
+                    cities_match = re.search(r"cities=\[([^\]]+)\]", itinerary_name)
+                    if cities_match:
+                        cities_str = cities_match.group(1)
+                        cities = [city.strip().strip("'\"") for city in cities_str.split(',')]
+                    
+                    # Extract total_distance_km
+                    distance_match = re.search(r'total_distance_km=([0-9.]+)', itinerary_name)
+                    if distance_match:
+                        total_distance_km = float(distance_match.group(1))
+                    
+                    # Extract carbon_emissions_kg
+                    carbon_match = re.search(r'carbon_emissions_kg=([0-9.]+)', itinerary_name)
+                    if carbon_match:
+                        carbon_emissions_kg = float(carbon_match.group(1))
             
             # Ensure cities is a list
             if cities is None:
                 cities = []
+            
+            # Clean up itinerary name (remove any remaining parameter prefixes)
+            if isinstance(itinerary_name, str):
+                itinerary_name = itinerary_name.replace('itinerary_name=', '').strip()
+            
+            print(f"DEBUG: Saving itinerary - Name: '{itinerary_name}', Cities: {cities}, Distance: {total_distance_km}, Carbon: {carbon_emissions_kg}")
             
             return save_itinerary.invoke({
                 'user_id': user_id,
@@ -87,6 +106,7 @@ def create_travel_agent_with_user(user_id: int):
                 'carbon_emissions_kg': carbon_emissions_kg
             })
         except Exception as e:
+            print(f"DEBUG: Error in save_itinerary_with_user: {str(e)}")
             return f"Error saving itinerary: {str(e)}"
     
     # Define available tools with user-specific save_itinerary
@@ -738,6 +758,73 @@ def get_latest_itinerary():
         
         return jsonify({
             'itinerary': latest_itinerary.to_dict(),
+            'status': 'success'
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'error': 'server_error',
+            'error_description': str(e)
+        }), 500
+
+
+@api_bp.route('/itineraries/<int:itinerary_id>/json', methods=['GET'])
+@require_auth_decorator
+def get_itinerary_json(itinerary_id):
+    """
+    Get the complete JSON data for a specific itinerary.
+    
+    Args:
+        itinerary_id (int): ID of the itinerary to retrieve
+        
+    Returns:
+        dict: JSON response with complete itinerary JSON data
+    """
+    try:
+        # Get Auth0 subject from the JWT payload
+        auth0_sub = g.current_user.get('sub')
+        
+        if not auth0_sub:
+            return jsonify({
+                'error': 'invalid_token',
+                'error_description': 'Token does not contain subject identifier'
+            }), 401
+        
+        # Find user
+        user = User.find_by_auth0_sub(auth0_sub)
+        if not user:
+            return jsonify({
+                'error': 'user_not_found',
+                'error_description': 'User not found'
+            }), 404
+        
+        # Find the specific itinerary
+        itinerary = Itinerary.query.filter_by(id=itinerary_id, user_id=user.id).first()
+        if not itinerary:
+            return jsonify({
+                'error': 'itinerary_not_found',
+                'error_description': 'Itinerary not found or access denied'
+            }), 404
+        
+        # Parse the JSON data from attractions field
+        import json
+        json_data = None
+        if itinerary.attractions:
+            try:
+                json_data = json.loads(itinerary.attractions)
+            except json.JSONDecodeError:
+                json_data = None
+        
+        return jsonify({
+            'itinerary_id': itinerary.id,
+            'itinerary_name': itinerary.name,
+            'json_data': json_data,
+            'raw_data': {
+                'cities': itinerary.to_dict()['cities'],
+                'total_distance_km': itinerary.total_distance_km,
+                'carbon_emissions_kg': itinerary.carbon_emissions_kg,
+                'created_at': itinerary.created_at.isoformat() if itinerary.created_at else None
+            },
             'status': 'success'
         }), 200
         

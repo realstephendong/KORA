@@ -3,8 +3,17 @@
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import MarkdownRenderer from '@/components/MarkdownRenderer';
 import { apiClient } from '@/lib/api-client';
 import { useAuth } from '@/contexts/AuthContext';
+
+// TypeScript declarations for Web Speech API
+declare global {
+  interface Window {
+    SpeechRecognition: any;
+    webkitSpeechRecognition: any;
+  }
+}
 
 interface ChatMessage {
   role: 'human' | 'ai';
@@ -28,14 +37,13 @@ export default function ChatPage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedCountry, setSelectedCountry] = useState<any>(null);
   const [hasInitialized, setHasInitialized] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isVoiceSupported, setIsVoiceSupported] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [autoReadEnabled, setAutoReadEnabled] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [profileImageSrc, setProfileImageSrc] = useState<string | null>(null);
-  const profileImages = [
-    '/assets/turtles/turtle blue.svg',
-    '/assets/turtles/turtle green.svg',
-    '/assets/turtles/turtle pink.svg',
-    '/assets/turtles/turtle purple.svg'
-  ];
+  const recognitionRef = useRef<any>(null);
+  const speechSynthesisRef = useRef<any>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -45,27 +53,33 @@ export default function ChatPage() {
     scrollToBottom();
   }, [messages]);
 
-  // Load user's profile image for the header avatar
+  // Initialize voice recognition
   useEffect(() => {
-    const loadProfileImage = async () => {
-      try {
-        const data: any = await apiClient.get('/api/profile');
-        const picture: string | undefined = data?.user?.profile_picture;
-        if (picture) {
-          const imageIndex = profileImages.findIndex(img => img.includes(picture));
-          if (imageIndex !== -1) {
-            setProfileImageSrc(profileImages[imageIndex]);
-          } else {
-            setProfileImageSrc(profileImages[0]);
-          }
-        } else {
-          setProfileImageSrc(profileImages[0]);
-        }
-      } catch (_) {
-        // Silently ignore; fallback image will be used
+    if (typeof window !== 'undefined') {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        setIsVoiceSupported(true);
+        recognitionRef.current = new SpeechRecognition();
+        recognitionRef.current.continuous = false;
+        recognitionRef.current.interimResults = false;
+        recognitionRef.current.lang = 'en-US';
+
+        recognitionRef.current.onresult = (event: any) => {
+          const transcript = event.results[0][0].transcript;
+          setChatInput(transcript);
+          setIsRecording(false);
+        };
+
+        recognitionRef.current.onerror = (event: any) => {
+          console.error('Speech recognition error:', event.error);
+          setIsRecording(false);
+        };
+
+        recognitionRef.current.onend = () => {
+          setIsRecording(false);
+        };
       }
-    };
-    loadProfileImage();
+    }
   }, []);
 
   // Initialize chat with country context
@@ -148,6 +162,13 @@ export default function ChatPage() {
       };
 
       setMessages([aiMessage]);
+      
+      // Auto-read the AI response if enabled
+      if (autoReadEnabled) {
+        setTimeout(() => {
+          speakText(aiMessage.content);
+        }, 500);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to send message');
     } finally {
@@ -181,10 +202,65 @@ export default function ChatPage() {
       };
 
       setMessages(prev => [...prev, aiMessage]);
+      
+      // Auto-read the AI response if enabled
+      if (autoReadEnabled) {
+        setTimeout(() => {
+          speakText(aiMessage.content);
+        }, 500); // Small delay to ensure message is rendered
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to send message');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const startVoiceRecording = () => {
+    if (recognitionRef.current && !isRecording) {
+      setIsRecording(true);
+      recognitionRef.current.start();
+    }
+  };
+
+  const stopVoiceRecording = () => {
+    if (recognitionRef.current && isRecording) {
+      recognitionRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
+  const speakText = (text: string) => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      // Stop any current speech
+      window.speechSynthesis.cancel();
+      
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 0.9;
+      utterance.pitch = 1;
+      utterance.volume = 0.8;
+      
+      utterance.onstart = () => {
+        setIsSpeaking(true);
+      };
+      
+      utterance.onend = () => {
+        setIsSpeaking(false);
+      };
+      
+      utterance.onerror = () => {
+        setIsSpeaking(false);
+      };
+      
+      speechSynthesisRef.current = utterance;
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
+  const stopSpeaking = () => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
     }
   };
 
@@ -247,21 +323,45 @@ export default function ChatPage() {
             </button>
           </form>
 
-          {/* User profile button */}
-          <button
-            className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 hover:opacity-80 transition-opacity"
-            aria-label="User profile"
-            onClick={() => router.push('/profile')}
-          >
-            <div className="relative w-full h-full">
-              <div className="absolute inset-0 bg-white border border-[#D8DFE9] rounded-[15px]"></div>
+          {/* Auto-read toggle and User profile button */}
+          <div className="flex items-center gap-3">
+            {/* Auto-read toggle */}
+            <button
+              onClick={() => setAutoReadEnabled(!autoReadEnabled)}
+              className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-all ${
+                autoReadEnabled 
+                  ? 'bg-green-100 text-green-600 hover:bg-green-200' 
+                  : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+              }`}
+              aria-label={autoReadEnabled ? "Disable auto-read" : "Enable auto-read"}
+              title={autoReadEnabled ? "Auto-read enabled" : "Auto-read disabled"}
+            >
+              <svg
+                className="w-5 h-5 sm:w-6 sm:h-6"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M3 9V15H7L12 20V4L7 9H3ZM16.5 12C16.5 10.23 15.48 8.71 14 7.97V16.02C15.48 15.29 16.5 13.77 16.5 12ZM14 3.23V5.29C16.89 6.15 19 8.83 19 12S16.89 17.85 14 18.71V20.77C18.01 19.86 21 16.28 21 12S18.01 4.14 14 3.23Z"
+                  fill="currentColor"
+                />
+              </svg>
+            </button>
+
+            {/* User profile button */}
+            <button
+              className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 hover:opacity-80 transition-opacity"
+              aria-label="User profile"
+              onClick={() => router.push('/profile')}
+            >
               <img
-                className="absolute inset-0 m-auto w-4/5 h-4/5 object-contain"
+                className="w-full h-full"
                 alt=""
-                src={profileImageSrc || profileImages[0]} 
+                src="https://c.animaapp.com/xia9nwm7/img/group-6@2x.png"
               />
-            </div>
-          </button>
+            </button>
+          </div>
         </div>
 
         {/* Main content area */}
@@ -334,7 +434,50 @@ export default function ChatPage() {
                             : 'bg-white text-gray-800 shadow-sm border border-gray-200'
                         }`}
                       >
-                        <p className="text-sm sm:text-base">{message.content}</p>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1">
+                            {message.role === 'ai' ? (
+                              <MarkdownRenderer 
+                                content={message.content} 
+                                className="text-sm sm:text-base"
+                              />
+                            ) : (
+                              <p className="text-sm sm:text-base">{message.content}</p>
+                            )}
+                          </div>
+                          {message.role === 'ai' && (
+                            <button
+                              onClick={() => isSpeaking ? stopSpeaking() : speakText(message.content)}
+                              className="flex-shrink-0 w-5 h-5 hover:opacity-80 transition-opacity"
+                              aria-label={isSpeaking ? "Stop reading" : "Read message aloud"}
+                            >
+                              <svg
+                                className="w-full h-full"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                xmlns="http://www.w3.org/2000/svg"
+                              >
+                                {isSpeaking ? (
+                                  // Stop icon
+                                  <rect
+                                    x="6"
+                                    y="6"
+                                    width="12"
+                                    height="12"
+                                    rx="2"
+                                    fill="#ef4444"
+                                  />
+                                ) : (
+                                  // Speaker icon
+                                  <path
+                                    d="M3 9V15H7L12 20V4L7 9H3ZM16.5 12C16.5 10.23 15.48 8.71 14 7.97V16.02C15.48 15.29 16.5 13.77 16.5 12ZM14 3.23V5.29C16.89 6.15 19 8.83 19 12S16.89 17.85 14 18.71V20.77C18.01 19.86 21 16.28 21 12S18.01 4.14 14 3.23Z"
+                                    fill="#6b7280"
+                                  />
+                                )}
+                              </svg>
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -381,6 +524,44 @@ export default function ChatPage() {
                 aria-label="Chat input"
                 disabled={isLoading}
               />
+
+              {/* Voice input button */}
+              {isVoiceSupported && (
+                <button
+                  type="button"
+                  onClick={isRecording ? stopVoiceRecording : startVoiceRecording}
+                  className={`w-6 h-6 sm:w-8 sm:h-8 md:w-10 md:h-10 lg:w-12 lg:h-12 hover:opacity-80 transition-opacity flex items-center justify-center ${
+                    isRecording ? 'animate-pulse' : ''
+                  }`}
+                  aria-label={isRecording ? "Stop voice recording" : "Start voice recording"}
+                  disabled={isLoading}
+                >
+                  <svg
+                    className="w-full h-full"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    {isRecording ? (
+                      // Stop recording icon (square)
+                      <rect
+                        x="6"
+                        y="6"
+                        width="12"
+                        height="12"
+                        rx="2"
+                        fill={isRecording ? "#ef4444" : "#6b7280"}
+                      />
+                    ) : (
+                      // Microphone icon
+                      <path
+                        d="M12 1C10.34 1 9 2.34 9 4V12C9 13.66 10.34 15 12 15C13.66 15 15 13.66 15 12V4C15 2.34 13.66 1 12 1ZM19 10V12C19 15.87 15.87 19 12 19C8.13 19 5 15.87 5 12V10H7V12C7 14.76 9.24 17 12 17C14.76 17 17 14.76 17 12V10H19ZM11 22H13V24H11V22Z"
+                        fill="#6b7280"
+                      />
+                    )}
+                  </svg>
+                </button>
+              )}
 
               <button
                 type="submit"

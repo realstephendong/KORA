@@ -193,7 +193,7 @@ def calculate_travel_details(cities: Union[List[str], Dict[str, Any], str]) -> D
 @tool
 def save_itinerary(user_id: int, itinerary_name: str, cities: List[str], total_distance_km: float, carbon_emissions_kg: float) -> str:
     """
-    Saves the final, complete itinerary to the database.
+    Saves the final, complete itinerary to the database as JSON.
     Use this ONLY when the user has confirmed they are happy with the plan.
     You must provide all parameters.
     
@@ -208,19 +208,52 @@ def save_itinerary(user_id: int, itinerary_name: str, cities: List[str], total_d
         str: Confirmation message
     """
     try:
-        # Create the itinerary in the database
-        itinerary = Itinerary.create_itinerary(
-            user_id=user_id,
-            name=itinerary_name,
-            cities=cities,
-            total_distance_km=total_distance_km,
-            carbon_emissions_kg=carbon_emissions_kg
-        )
+        import json
+        from datetime import datetime
         
-        return f"Successfully saved itinerary '{itinerary_name}' to the database with ID {itinerary.id}"
+        # Create comprehensive JSON data structure
+        itinerary_data = {
+            "itinerary_info": {
+                "name": itinerary_name,
+                "user_id": user_id,
+                "created_at": datetime.now().isoformat(),
+                "version": "1.0"
+            },
+            "travel_details": {
+                "cities": cities,
+                "total_distance_km": total_distance_km,
+                "carbon_emissions_kg": carbon_emissions_kg,
+                "estimated_drive_time_hours": round(total_distance_km / 60, 1) if total_distance_km > 0 else 0
+            },
+            "sustainability_metrics": {
+                "carbon_per_km": round(carbon_emissions_kg / total_distance_km, 3) if total_distance_km > 0 else 0,
+                "carbon_per_city": round(carbon_emissions_kg / len(cities), 2) if len(cities) > 0 else 0,
+                "distance_per_city": round(total_distance_km / len(cities), 2) if len(cities) > 0 else 0
+            },
+            "metadata": {
+                "city_count": len(cities),
+                "is_multi_city": len(cities) > 1,
+                "saved_via": "ai_agent"
+            }
+        }
+        
+        # Convert to JSON string for storage
+        itinerary_json = json.dumps(itinerary_data, indent=2)
+        
+
+        
+        # Store the JSON data in the enhanced fields # Using attractions field to store JSON data
+        
+        with open('backend\\app\\agent\\itinerary.json', 'w') as json_file:
+            json.dump(itinerary_json, json_file, indent=4)
+
+        print(f"DEBUG: Saved itinerary JSON data: {itinerary_json}")
+        
         
     except Exception as e:
         print(f"Error saving itinerary: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return f"Error saving itinerary: {str(e)}"
 
 @tool
