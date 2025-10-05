@@ -27,6 +27,68 @@ export default function ProfilePage() {
   const [profileData, setProfileData] = useState<ApiResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
+  const [budgetRange, setBudgetRange] = useState("");
+  const [budgetError, setBudgetError] = useState("");
+
+  const interests = [
+    { id: 1, label: "Fashion" },
+    { id: 2, label: "Food & treats" },
+    { id: 3, label: "Nature & Wildlife" },
+    { id: 4, label: "Learning about Culture" },
+  ];
+
+  const toggleInterest = (label: string) => {
+    setSelectedInterests((prev) =>
+      prev.includes(label)
+        ? prev.filter((item) => item !== label)
+        : [...prev, label],
+    );
+  };
+
+  const isSelected = (label: string) => selectedInterests.includes(label);
+
+  // Budget validation
+  const handleBudgetChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    // Only allow numbers
+    if (value === '' || /^\d+$/.test(value)) {
+      setBudgetRange(value);
+      setBudgetError('');
+    }
+  };
+
+  const validateBudget = () => {
+    if (!budgetRange.trim()) {
+      setBudgetError('Budget is required');
+      return false;
+    }
+    if (!/^\d+$/.test(budgetRange)) {
+      setBudgetError('Please enter only numbers');
+      return false;
+    }
+    setBudgetError('');
+    return true;
+  };
+  
+  // Profile picture management
+  const profileImages = [ 
+    '/profile/turtle blue.svg',
+    '/profile/turtle green.svg',
+    '/profile/turtle pink.svg',
+    '/profile/turtle purple.svg'
+  ];
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  // Profile picture navigation functions
+  const nextImage = () => {
+    setCurrentImageIndex((prev) => (prev + 1) % profileImages.length);
+  };
+
+  const prevImage = () => {
+    setCurrentImageIndex((prev) => (prev - 1 + profileImages.length) % profileImages.length);
+  };
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -58,68 +120,133 @@ export default function ProfilePage() {
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8">
-        <div className="max-w-4xl mx-auto px-4">
-          <div className="bg-white rounded-lg shadow-lg p-8">
-            <div className="flex items-center justify-between mb-8">
-              <h1 className="text-3xl font-bold text-gray-800">Your Profile</h1>
-              <a 
-                href="/api/auth/logout" 
-                className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
-              >
-                Logout
-              </a>
+      <div className="bg-[linear-gradient(0deg,rgba(246,245,250,1)_0%,rgba(246,245,250,1)_100%)] w-full min-h-screen relative">
+        <main className="max-w-4xl mx-auto py-8 px-4">
+          <div className="bg-white rounded-[50px] border-2 border-solid border-[#d8dfe980] bg-gradient-to-b from-[rgba(216,223,233,0.25)] to-transparent p-8 shadow-lg">
+            
+            {/* Profile Picture Selector */}
+            <div className="text-center mb-8">
+              <h2 className="text-2xl font-bold text-gray-800 mb-6">Choose Your Profile Picture</h2>
+              <div className="flex items-center justify-center space-x-4">
+                <button
+                  onClick={prevImage}
+                  className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-full transition-colors"
+                  aria-label="Previous image"
+                >
+                  ‹
+                </button>
+                
+                <div className="relative w-32 h-32 bg-gray-100 rounded-full overflow-hidden border-4 border-gray-300 flex items-center justify-center">
+                  <img
+                    src={profileImages[currentImageIndex]}
+                    alt={`Profile picture ${currentImageIndex + 1}`}
+                    className="w-24 h-24 object-contain"
+                  />
+                </div>
+                
+                <button
+                  onClick={nextImage}
+                  className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-full transition-colors"
+                  aria-label="Next image"
+                >
+                  ›
+                </button>
+              </div>
+              
+              <div className="text-center mt-4">
+                <p className="text-sm text-gray-600">
+                  {currentImageIndex + 1} of {profileImages.length}
+                </p>
+                {/* <p className="text-xs text-gray-500 mt-1">
+                  {profileImages[currentImageIndex].replace('.svg', '').replace(/([A-Z])/g, ' $1').trim()}
+                </p> */}
+              </div>
             </div>
 
+            {/* Error Display */}
             {error && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
                 <p className="text-red-600">Error: {error}</p>
               </div>
             )}
 
+            {/* Profile Data Display */}
             {profileData && (
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="bg-gray-50 rounded-lg p-6">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-4">Auth0 Information</h3>
-                    <div className="space-y-2">
-                      <p><span className="font-medium">Name:</span> {profileData.auth0_info.name}</p>
-                      <p><span className="font-medium">Email:</span> {profileData.auth0_info.email}</p>
-                      <p><span className="font-medium">Subject ID:</span> {profileData.auth0_info.sub}</p>
-                    </div>
-                  </div>
-
-                  <div className="bg-gray-50 rounded-lg p-6">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-4">Database Information</h3>
-                    <div className="space-y-2">
-                      <p><span className="font-medium">User ID:</span> {profileData.user.id}</p>
-                      <p><span className="font-medium">Created:</span> {new Date(profileData.user.created_at).toLocaleDateString()}</p>
-                      <p><span className="font-medium">Last Updated:</span> {new Date(profileData.user.updated_at).toLocaleDateString()}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-blue-50 rounded-lg p-6">
-                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Quick Actions</h3>
-                  <div className="flex flex-wrap gap-4">
-                    <a 
-                      href="/globe" 
-                      className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-                    >
-                      Back to Globe
-                    </a>
-                    <a 
-                      href="/chat" 
-                      className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
-                    >
-                      Start Planning
-                    </a>
-                  </div>
+              <div className="bg-gray-50 rounded-lg p-6 mb-6">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">User Information</h3>
+                <div className="space-y-2">
+                  <p><span className="font-medium">Name:</span> {profileData.auth0_info.name}</p>
+                  <p><span className="font-medium">Email:</span> {profileData.auth0_info.email}</p>
+                  <p><span className="font-medium">Subject ID:</span> {profileData.auth0_info.sub}</p>
                 </div>
               </div>
             )}
+
+            {/* Budget Section */}
+            <div className="mb-6">
+              <label className="block text-xl font-medium text-gray-800 mb-2">
+                Budget <span className="text-red-500">*</span>
+              </label>
+              <div className="flex w-full items-center px-5 py-2.5 bg-white rounded-[20px] border border-gray-300 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-200">
+                <span className="text-gray-500 mr-2">$</span>
+                <input
+                  type="text"
+                  value={budgetRange}
+                  onChange={handleBudgetChange}
+                  onBlur={validateBudget}
+                  placeholder="0-00000"
+                  className="flex-1 outline-none text-gray-800 placeholder-gray-400"
+                  required
+                />
+              </div>
+              {budgetError && (
+                <p className="text-red-500 text-sm mt-1">{budgetError}</p>
+              )}
+            </div>
+
+            {/* Interests Section */}
+            <div className="mb-8">
+              <h2 className="text-xl font-medium text-gray-800 mb-4">
+                Pick your interests!
+              </h2>
+              <div className="flex flex-wrap gap-3">
+                {interests.map((interest) => (
+                  <button
+                    key={interest.id}
+                    type="button"
+                    onClick={() => toggleInterest(interest.label)}
+                    className={`inline-flex items-center justify-center px-5 py-2.5 rounded-[25px] border border-solid border-gray-800 overflow-hidden transition-colors ${
+                      isSelected(interest.label) ? "bg-[#eeefa4]" : "bg-transparent hover:bg-gray-100"
+                    }`}
+                    aria-pressed={isSelected(interest.label)}
+                  >
+                    <span className="font-bold text-gray-800 text-lg">
+                      {interest.label}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Save Button */}
+            <div className="text-center">
+              <button
+                type="button"
+                onClick={() => {
+                  if (validateBudget()) {
+                    // Handle profile save logic here
+                    console.log('Profile saved with budget:', budgetRange);
+                    alert('Profile saved successfully!');
+                  }
+                }}
+                className="bg-[#231f20] hover:bg-gray-800 text-white font-bold py-3 px-8 rounded-[25px] transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                disabled={!budgetRange.trim()}
+              >
+                I&apos;m happy with my profile!
+              </button>
+            </div>
           </div>
-        </div>
+        </main>
       </div>
     </ProtectedRoute>
   );

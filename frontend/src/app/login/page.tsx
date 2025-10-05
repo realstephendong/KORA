@@ -12,6 +12,7 @@ export default function LoginPage() {
     email: '',
     password: ''
   });
+  const [errors, setErrors] = useState<{[key: string]: string}>({});
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -21,11 +22,32 @@ export default function LoginPage() {
     }));
   };
 
+  const validateForm = () => {
+    const newErrors: {[key: string]: string} = {};
+
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email is required';
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.email = 'Please enter a valid email address';
+    }
+
+    if (!formData.password) {
+      newErrors.password = 'Password is required';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // This form is for UI purposes only - Auth0 handles authentication
-    // Redirect to Auth0 login
-    window.location.href = getAuth0LoginUrl();
+    
+    if (validateForm()) {
+      // Note: This form is for UI purposes only
+      // Auth0 handles the actual authentication
+      // Redirect to Auth0 login
+      window.location.href = getAuth0LoginUrl();
+    }
   };
 
   if (isLoading) {
@@ -74,8 +96,12 @@ export default function LoginPage() {
                 value={formData.email}
                 onChange={handleInputChange}
                 placeholder="Enter your email"
+                required
                 className="w-full text-[#212121] font-['Onest'] text-xl font-normal leading-normal border-none outline-none bg-transparent placeholder:text-[#A1A1A1]"
               />
+              {errors.email && (
+                <span className="text-red-500 text-sm mt-1">{errors.email}</span>
+              )}
             </div>
           </div>
 
@@ -90,8 +116,12 @@ export default function LoginPage() {
               value={formData.password}
               onChange={handleInputChange}
               placeholder="Enter your password"
+              required
               className="w-full text-[#212121] font-['Onest'] text-xl font-normal leading-normal border-none outline-none bg-transparent placeholder:text-[#A1A1A1]"
             />
+            {errors.password && (
+              <span className="text-red-500 text-sm mt-1">{errors.password}</span>
+            )}
           </div>
 
           {/* Login Button */}
