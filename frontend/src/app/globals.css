@@ -24,3 +24,35 @@ body {
     min-height: 316px;
   }
 }
+
+/* Turtle talking animation - blocky frame switching */
+@keyframes turtleTalk {
+  0% {
+    opacity: 1;
+  }
+  49% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Chat message animation */
+@keyframes messageSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.chat-message {
+  animation: messageSlideUp 0.3s ease-out;
+}

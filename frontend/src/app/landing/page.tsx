@@ -9,13 +9,13 @@ export default function LandingPage() {
   const router = useRouter();
 
   const handleCreateProfile = () => {
-    // Redirect to login page
-    router.push('/login');
+    // Redirect directly to Auth0 login
+    window.location.href = getAuth0LoginUrl();
   };
 
   const handleLogin = () => {
-    // Redirect to login page
-    router.push('/login');
+    // Redirect directly to Auth0 login
+    window.location.href = getAuth0LoginUrl();
   };
 
   const handleLogout = () => {
