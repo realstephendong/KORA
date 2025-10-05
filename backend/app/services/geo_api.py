@@ -38,6 +38,7 @@ def fetch_cities_for_country(country_name: str) -> List[str]:
         country_code_map = {
             'france': 'FR',
             'united states': 'US',
+            'united states of america': 'US',
             'usa': 'US',
             'america': 'US',
             'united kingdom': 'GB',
