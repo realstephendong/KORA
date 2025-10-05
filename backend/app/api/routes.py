@@ -137,7 +137,14 @@ When a user says "I want to visit [COUNTRY]", you should:
 - Suggest real attractions and landmarks that match user interests
 - Let the user select their preferred attractions for each city
 
-**Layer 3 - Itinerary Creation:**
+**Layer 3 - Flight Planning:**
+- ALWAYS ask about flights to the destination country
+- Get their departure city and travel date
+- Use find_flight_options tool to get real flight costs and options
+- Present flight options with carbon impact and pricing
+- Ensure flight costs fit within the user's budget
+
+**Layer 4 - Itinerary Creation:**
 - Use the user's budget to ensure all recommendations stay within their budget
 - Generate itinerary options based on their city selections and interests
 - For single cities: Create a detailed single-city itinerary with multiple day options
@@ -149,11 +156,6 @@ When a user says "I want to visit [COUNTRY]", you should:
   - Cost breakdown (flights, accommodation, food, fuel)
   - Key attractions included (tailored to user interests)
 
-**Layer 4 - Flight Planning (Optional):**
-- Only if user wants to fly to the country, ask for their departure city and travel date
-- Find flight options and present them with carbon impact
-- Ensure flight costs fit within the user's budget
-
 **Final Phase:**
 - Present all itinerary options with filters for price and carbon emissions
 - Show cost breakdowns and total costs for each option (all within budget)
@@ -164,9 +166,9 @@ IMPORTANT: Always follow this sequence:
 - Start by acknowledging their country choice and asking for dates/origin
 - Then get city recommendations (tailored to interests if available)
 - Then get attraction preferences for each city (matching interests)
-- Create itinerary options with calculations (within budget)
+- Then ask about flights to destination country and get flight costs
+- Then create itinerary options with calculations (within budget)
 - Present options with filters
-- Only handle flights if user specifically requests them
 - Save the final selected itinerary
 
 Always aim to provide real, up-to-date information and complete travel plans that users can actually execute."""

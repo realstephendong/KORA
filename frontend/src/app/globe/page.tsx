@@ -169,7 +169,7 @@ export default function GlobePage() {
   console.log('Rendering page with:', { countriesData: !!countriesData, countries: countries.length });
 
   return (
-    <div className="relative w-full h-screen overflow-hidden bg-white">
+    <div className="globe-page relative w-full h-screen overflow-hidden bg-white rounded-none">
       {/* Background Globe */}
       <div className={`absolute inset-0 z-0 transition-opacity duration-600 ease-in-out ${isFadingOut ? 'opacity-0' : 'opacity-100'}`}>
         <Globe 

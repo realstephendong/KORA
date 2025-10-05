@@ -23,7 +23,7 @@ def create_travel_agent() -> AgentExecutor:
     """
     # Initialize Google Gemini model (free tier)
     llm = ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash",
+        model="gemini-2.5-pro",
         temperature=0,
         convert_system_message_to_human=True,
         google_api_key=os.environ.get('GOOGLE_API_KEY')
@@ -35,66 +35,46 @@ def create_travel_agent() -> AgentExecutor:
     # Pull the standard ReAct prompt from LangChain Hub
     prompt = hub.pull("hwchase17/react-chat")
     
-    # Add custom system message to make agent aware of new capabilities
-    system_message = """You are a travel planning assistant. Help users plan their trips by providing city recommendations and itinerary options.
+    # Add custom system message with improved prompt engineering
+    system_message = """You are a travel planning assistant. You help users plan trips by gathering information and creating itineraries.
 
-## CRITICAL RULES:
-- NEVER mention tool names in your responses
-- NEVER show "Action:" or "Action Input:" in your responses  
-- NEVER mention that you're using tools or APIs
-- Keep responses concise and natural
-- If you get stuck, ask a simple question to move forward
-- Focus on travel recommendations, not technical details
+## CONVERSATION STATE TRACKING
+Track what information you have and what you still need:
 
-## IMPORTANT: Always follow the ReAct pattern correctly:
-- After "Thought:", you MUST include "Action:" and "Action Input:"
-- If you don't need to use a tool, end with "Final Answer:"
-- Never leave "Thought:" without a follow-up action
+**REQUIRED INFO:**
+- Country: [already provided by user]
+- Travel dates: [departure date + duration]
+- Origin: [where they're traveling from]
+- Cities: [which cities they want to visit]
+- Attractions: [what they want to see in each city]
+- Flight costs: [flight options and costs to and from the destination country]
 
-## WORKFLOW (Country is already selected by user):
+**OPTIONAL INFO:**
+- Budget: [if provided, use for recommendations]
+- Interests: [if provided, tailor recommendations]
 
-**Layer 1 - City Discovery:**
-- The user has already selected a country (this is given context)
-- Ask: "What cities do you want to visit in [COUNTRY]?" 
-- Suggest top cities in that country
-- Let the user choose cities they're interested in (even if just one city)
+## RESPONSE FORMAT
+- For simple responses: Thought: [reasoning] → Final Answer: [response]
+- For tool use: Thought: [reasoning] → Action: [tool] → Action Input: [params] → Observation: [result] → Final Answer: [response]
+- CRITICAL: ALWAYS end with either "Action:" or "Final Answer:" - never just "Thought:"
+- If you think about something (Thought:), you MUST follow with either Action: or Final Answer:
+- Never leave a response incomplete - always complete the ReAct pattern
 
-**Layer 2 - Attraction Discovery:**
-- For each selected city, ask: "What places do you want to visit in [CITY]?"
-- Suggest real attractions and landmarks
-- Let the user select their preferred attractions for each city
+## CONVERSATION FLOW
+1. **Acknowledge country** and ask for travel dates + origin
+2. **Get city preferences** - suggest cities, let them choose
+3. **Get attraction preferences** - for each chosen city
+4. **Get flight information** - ask about flights to and from destination country and get flight costs
+5. **Create itineraries** - use tools to calculate routes, costs, carbon
+6. **Present options** - show different itinerary choices
+7. **Save final choice** - offer to save their selected itinerary
 
-**Layer 3 - Itinerary Creation:**
-- Ask the user for their food budget for the entire trip
-- Generate itinerary options based on their city selections
-- For single cities: Create a detailed single-city itinerary with multiple day options
-- For multiple cities: Create different city orders/routes with distance and carbon calculations
-- Present itinerary options with:
-  - Different routes (if multiple cities) or day-by-day plans (if single city)
-  - Total distance and carbon emissions (if applicable)
-  - Estimated travel time and total costs
-  - Cost breakdown (flights, accommodation, food, fuel)
-  - Key attractions included
-
-**Layer 4 - Flight Planning (Optional):**
-- Only if user wants to fly to the country, ask for their departure city and travel date
-- Find flight options and present them with carbon impact
-
-**Final Phase:**
-- Present all itinerary options with filters for price and carbon emissions
-- Show cost breakdowns and total costs for each option
-- Let user select their preferred itinerary
-- Offer to save the final selected itinerary
-
-IMPORTANT: Always follow this sequence:
-- Start with city recommendations (country is already known)
-- Then get attraction preferences for each city
-- Create itinerary options with calculations
-- Present options with filters
-- Only handle flights if user specifically requests them
-- Save the final selected itinerary
-
-Always aim to provide real, up-to-date information and complete travel plans that users can actually execute."""
+## KEY RULES
+- NEVER ask for country (already selected from globe)
+- When user says "3 days", understand this is trip duration, not ask for return date
+- Use their budget and interests to tailor recommendations
+- Keep responses natural and conversational
+- Don't mention tools or technical details in responses"""
     
     # Add the system message to the prompt
     if hasattr(prompt, 'messages'):
@@ -107,14 +87,30 @@ Always aim to provide real, up-to-date information and complete travel plans tha
     agent = create_react_agent(llm, tools, prompt)
     
     # Create the agent executor with better error handling
+    def handle_parsing_error(error):
+        """Handle parsing errors by providing a fallback response"""
+        return "I need to help you plan your trip. What cities would you like to visit?"
+    
+    # Enhanced error handling function
+    def enhanced_parsing_error_handler(error):
+        """Enhanced parsing error handler with better fallback responses"""
+        error_str = str(error)
+        
+        # If it's a ReAct parsing error, provide a helpful response
+        if "Missing 'Action:'" in error_str or "Invalid Format" in error_str:
+            return "I'm here to help you plan your trip! What would you like to know about your destination?"
+        
+        # For other parsing errors, provide a general helpful response
+        return "I need to help you plan your trip. What cities would you like to visit?"
+    
     agent_executor = AgentExecutor(
         agent=agent,
         tools=tools,
         verbose=True,
         return_intermediate_steps=True,
-        handle_parsing_errors=True,
-        max_iterations=5,  # Allow enough iterations for proper workflow
-        max_execution_time=30  # Add time limit
+        handle_parsing_errors=enhanced_parsing_error_handler,  # Use custom error handler
+        max_iterations=3,  # Reduce iterations to prevent loops
+        max_execution_time=20  # Reduce time limit to prevent hanging
     )
     
     return agent_executor
@@ -180,15 +176,48 @@ def invoke_agent_with_history(
                 "error": "Agent iteration limit exceeded"
             }
         
-        # Check for parsing errors and provide a helpful response
-        if ("Invalid Format: Missing 'Action:'" in output_text and 
-            "Thought:" in output_text and 
-            "Action:" not in output_text):
+        # Check for various parsing errors and provide helpful responses
+        parsing_errors = [
+            "Invalid Format: Missing 'Action:'",
+            "Missing 'Action:' after 'Thought:'",
+            "Invalid Format: Missing 'Action:' after 'Thought:'",
+            "Expected 'Action:' after 'Thought:'"
+        ]
+        
+        # Check if output contains Thought but no Action
+        has_thought = "Thought:" in output_text
+        has_action = "Action:" in output_text
+        has_final_answer = "Final Answer:" in output_text
+        
+        # Detect incomplete ReAct pattern
+        if (has_thought and not has_action and not has_final_answer) or any(error in output_text for error in parsing_errors):
+            # Try to extract the thought content to provide a more contextual response
+            thought_content = ""
+            if "Thought:" in output_text:
+                try:
+                    thought_start = output_text.find("Thought:") + len("Thought:")
+                    thought_end = output_text.find("\n", thought_start)
+                    if thought_end == -1:
+                        thought_end = len(output_text)
+                    thought_content = output_text[thought_start:thought_end].strip()
+                except:
+                    thought_content = ""
+            
+            # Provide contextual fallback based on conversation state
+            if "city" in thought_content.lower() or "cities" in thought_content.lower():
+                fallback_response = "Great! Let me help you explore some amazing cities. What specific cities are you most interested in visiting?"
+            elif "flight" in thought_content.lower() or "fly" in thought_content.lower():
+                fallback_response = "I'd be happy to help you find flight options! What's your departure city and when are you planning to travel?"
+            elif "attraction" in thought_content.lower() or "visit" in thought_content.lower():
+                fallback_response = "I'd love to help you find interesting attractions! What places would you like to visit?"
+            else:
+                fallback_response = "I'm here to help you plan your trip! What would you like to know about your destination?"
+            
             return {
-                "output": "I apologize, but I encountered a technical issue. Let me help you with your travel planning. What specific cities in Spain are you most interested in visiting?",
+                "output": fallback_response,
                 "intermediate_steps": [],
                 "success": False,
-                "error": "ReAct parsing error"
+                "error": "ReAct parsing error - incomplete thought/action pattern"
             }
         
         return {

@@ -5,6 +5,7 @@ Provides JWT token validation and authentication decorators.
 
 import os
 import json
+import time
 from functools import wraps
 from flask import request, jsonify, g
 from authlib.integrations.flask_oauth2 import ResourceProtector
@@ -15,6 +16,44 @@ import jwt as pyjwt
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.backends import default_backend
+
+# Cache for JWKS and converted keys
+_jwks_cache = {}
+_jwks_cache_time = 0
+JWKS_CACHE_DURATION = 3600  # 1 hour
+
+
+def get_cached_jwks(auth0_domain):
+    """
+    Get JWKS from cache or fetch from Auth0 if cache is expired.
+    
+    Args:
+        auth0_domain (str): Auth0 domain
+        
+    Returns:
+        dict: JWKS data
+    """
+    global _jwks_cache, _jwks_cache_time
+    
+    current_time = time.time()
+    
+    # Check if cache is valid
+    if (auth0_domain in _jwks_cache and 
+        current_time - _jwks_cache_time < JWKS_CACHE_DURATION):
+        return _jwks_cache[auth0_domain]
+    
+    # Fetch fresh JWKS
+    try:
+        jsonurl = requests.get(f'https://{auth0_domain}/.well-known/jwks.json', timeout=5)
+        jwks = jsonurl.json()
+        _jwks_cache[auth0_domain] = jwks
+        _jwks_cache_time = current_time
+        return jwks
+    except Exception as e:
+        # If fetch fails and we have cached data, use it even if expired
+        if auth0_domain in _jwks_cache:
+            return _jwks_cache[auth0_domain]
+        raise e
 
 
 class AuthError(Exception):
@@ -119,37 +158,25 @@ def verify_decode_jwt(token):
     if not auth0_domain or not auth0_audience:
         raise AuthError('configuration_error', 'Auth0 configuration is missing.', 500)
     
-    # Get the public key from Auth0
-    jsonurl = requests.get(f'https://{auth0_domain}/.well-known/jwks.json')
-    jwks = jsonurl.json()
+    # Get the public key from Auth0 (using cache)
+    jwks = get_cached_jwks(auth0_domain)
     
     try:
         unverified_header = pyjwt.get_unverified_header(token)
-        print(f"DEBUG: Token header: {unverified_header}")
     except Exception as e:
-        print(f"DEBUG: Error parsing token header: {e}")
         raise AuthError('invalid_header', 'Unable to parse authentication token.', 401)
     
     rsa_key = {}
-    print(f"DEBUG: Looking for kid: {unverified_header['kid']}")
-    print(f"DEBUG: Available keys: {[key['kid'] for key in jwks['keys']]}")
     
     for key in jwks['keys']:
         if key['kid'] == unverified_header['kid']:
             # Convert JWK to PEM format
             rsa_key = jwk_to_pem(key)
-            print(f"DEBUG: Found matching key: {key['kid']}")
-            print(f"DEBUG: Converted to PEM format")
             break
     
     if rsa_key:
         try:
-            # First, decode without validation to see what's in the token
-            unverified_payload = pyjwt.decode(token, options={"verify_signature": False})
-            print(f"DEBUG: Unverified token payload: {unverified_payload}")
-            
-            print(f"DEBUG: Attempting JWT decode with audience: {auth0_audience}")
-            print(f"DEBUG: Attempting JWT decode with issuer: https://{auth0_domain}/")
+            # Verify and decode the token
             
             # For access tokens, we need to be more flexible with audience validation
             # Access tokens can have different audiences depending on the Auth0 configuration
@@ -163,7 +190,6 @@ def verify_decode_jwt(token):
                     issuer=f'https://{auth0_domain}/'
                 )
             except pyjwt.InvalidAudienceError:
-                print(f"DEBUG: Audience mismatch, trying without audience validation")
                 # If audience validation fails, try without it (for access tokens)
                 payload = pyjwt.decode(
                     token,
@@ -172,19 +198,15 @@ def verify_decode_jwt(token):
                     issuer=f'https://{auth0_domain}/',
                     options={"verify_aud": False}
                 )
-            print(f"DEBUG: JWT decode successful: {payload}")
             return payload
             
         except pyjwt.ExpiredSignatureError as e:
-            print(f"DEBUG: Token expired: {e}")
             raise AuthError('token_expired', 'Token expired.', 401)
             
         except pyjwt.InvalidTokenError as e:
-            print(f"DEBUG: Invalid token: {e}")
             raise AuthError('invalid_claims', 'Incorrect claims. Please check the audience and issuer.', 401)
             
         except Exception as e:
-            print(f"DEBUG: JWT decode error: {e}")
             raise AuthError('invalid_header', 'Unable to parse authentication token.', 401)
     
     raise AuthError('invalid_header', 'Unable to find appropriate key.', 401)

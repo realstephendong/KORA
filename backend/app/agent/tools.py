@@ -317,15 +317,38 @@ def create_multiple_itineraries(cities: Union[List[str], Dict[str, Any], str], o
                 from app.services.flight_api import search_flights
                 from app.services.geo_api import get_iata_code
                 
-                # Get IATA codes
+                # Get origin IATA code
                 origin_iata = get_iata_code(origin_city)
-                dest_iata = get_iata_code(destination_country)
+                
+                # Map destination country to airport code (same as in find_flight_options)
+                destination_airports = {
+                    'france': 'CDG', 'spain': 'MAD', 'italy': 'FCO', 'germany': 'FRA',
+                    'united kingdom': 'LHR', 'uk': 'LHR', 'england': 'LHR',
+                    'japan': 'NRT', 'china': 'PEK', 'australia': 'SYD', 'canada': 'YYZ',
+                    'brazil': 'GRU', 'india': 'DEL', 'mexico': 'MEX', 'south korea': 'ICN',
+                    'korea': 'ICN', 'netherlands': 'AMS', 'belgium': 'BRU', 'switzerland': 'ZUR',
+                    'austria': 'VIE', 'sweden': 'ARN', 'norway': 'OSL', 'denmark': 'CPH',
+                    'finland': 'HEL', 'poland': 'WAW', 'czech republic': 'PRG', 'hungary': 'BUD',
+                    'portugal': 'LIS', 'greece': 'ATH', 'turkey': 'IST', 'russia': 'SVO'
+                }
+                
+                dest_iata = destination_airports.get(destination_country.lower())
                 
                 if origin_iata and dest_iata:
                     flights = search_flights(origin_iata, dest_iata, travel_date)
                     if flights:
                         # Extract prices from flight results
-                        flight_costs = [flight.get('price') for flight in flights if 'price' in flight and flight.get('price') is not None]
+                        flight_costs = []
+                        for flight in flights:
+                            price = flight.get('price', 0)
+                            if price:
+                                # Convert to float if it's a string, then check if > 0
+                                try:
+                                    price_float = float(price)
+                                    if price_float > 0:
+                                        flight_costs.append(price_float)
+                                except (ValueError, TypeError):
+                                    continue
                     
             except Exception as e:
                 logger.warning(f"Error getting flight costs: {str(e)}")
@@ -550,10 +573,14 @@ def find_flight_options(origin_city: Union[str, Dict[str, Any]], destination_cou
                 
             flight_options.append({
                 'airline': airline,
+                'price': flight.get('price', 0),
+                'currency': flight.get('currency', 'USD'),
                 'departure_time': flight.get('departure_time', ''),
                 'arrival_time': flight.get('arrival_time', ''),
                 'stops': flight.get('number_of_stops', 0),
-                'route': flight.get('route', f'{origin_iata} to {destination_iata}')
+                'route': flight.get('route', f'{origin_iata} to {destination_iata}'),
+                'is_direct': flight.get('is_direct', False),
+                'source': flight.get('source', 'Unknown')
             })
             
             unique_airlines.add(airline)

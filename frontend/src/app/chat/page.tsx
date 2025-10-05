@@ -54,6 +54,8 @@ export default function ChatPage() {
             
             // Send initial message to backend with country context
             const initialMessage = `I want to visit ${countryData.name}`;
+            console.log('DEBUG: Country data from localStorage:', countryData);
+            console.log('DEBUG: Initial message:', initialMessage);
             
             setIsLoading(true);
             const response: ApiResponse = await apiClient.post('/api/chat/message', {
@@ -235,18 +237,51 @@ export default function ChatPage() {
             
             {/* Chat area with turtle and conversation */}
             <div className="flex gap-4 sm:gap-6 mb-4 sm:mb-6">
-              {/* Turtle SVG - 30% width */}
+              {/* Animated Turtle SVG - 30% width */}
               <div className="w-[30%] flex items-end justify-center">
-                <img
-                  className="w-full h-auto max-w-[120px] sm:max-w-[150px] md:max-w-[180px]"
-                  alt="Sea turtle talking"
-                  src="/assets/turtles/turtle blue.svg"
-                />
+                <div className="relative w-full h-auto max-w-[160px] sm:max-w-[200px] md:max-w-[240px]">
+                  {isLoading ? (
+                    <div className="relative w-full h-auto flex items-end justify-center" style={{ minHeight: '160px' }}>
+                      {/* First turtle state */}
+                      <img
+                        className="w-full h-auto"
+                        alt="Sea turtle talking state 1"
+                        src="/chat/seazine-031.svg"
+                        style={{
+                          animation: 'turtleTalk 1.2s steps(2, end) infinite',
+                          position: 'absolute',
+                          bottom: 0,
+                          left: '50%',
+                          transform: 'translateX(-50%)'
+                        }}
+                      />
+                      {/* Second turtle state */}
+                      <img
+                        className="w-full h-auto"
+                        alt="Sea turtle talking state 2"
+                        src="/chat/seazine-032.svg"
+                        style={{
+                          animation: 'turtleTalk 1.2s steps(2, end) infinite reverse',
+                          position: 'absolute',
+                          bottom: 0,
+                          left: '50%',
+                          transform: 'translateX(-50%)'
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <img
+                      className="w-full h-auto"
+                      alt="Sea turtle"
+                      src="/chat/seazine-032.svg"
+                    />
+                  )}
+                </div>
               </div>
               
               {/* Chat conversation area - 70% width */}
               <div className="w-[70%] bg-[linear-gradient(180deg,rgba(216,223,233,0)_0%,rgba(218,224,234,0.3)_100%),linear-gradient(0deg,rgba(239,240,164,0)_0%,rgba(239,240,164,0)_100%)] rounded-[20px] sm:rounded-[30px] lg:rounded-[40px] border-2 border-solid border-[#d8dfe9] h-[200px] sm:h-[250px] md:h-[300px] lg:h-[350px] overflow-hidden">
-                <div className="h-full overflow-y-auto p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4 flex flex-col-reverse">
+                <div className="h-full overflow-y-auto p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4 flex flex-col">
                   {messages.length === 0 && (
                     <div className="text-center text-gray-500 mt-6 sm:mt-8">
                       <h3 className="text-lg sm:text-xl font-semibold mb-2">Welcome to Kora!</h3>
@@ -257,7 +292,7 @@ export default function ChatPage() {
                   {messages.map((message, index) => (
                     <div
                       key={index}
-                      className={`flex ${message.role === 'human' ? 'justify-end' : 'justify-start'}`}
+                      className={`flex ${message.role === 'human' ? 'justify-end' : 'justify-start'} chat-message`}
                     >
                       <div
                         className={`max-w-[80%] sm:max-w-sm md:max-w-md lg:max-w-lg px-3 py-2 sm:px-4 sm:py-2 rounded-lg ${

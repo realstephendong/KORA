@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { apiClient } from '@/lib/api-client';
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 interface UserProfile {
   id: number;
@@ -24,6 +25,7 @@ interface ApiResponse {
 
 export default function ProfilePage() {
   const { user, isLoading } = useAuth();
+  const router = useRouter();
   const [profileData, setProfileData] = useState<ApiResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -95,6 +97,29 @@ export default function ProfilePage() {
       try {
         const data = await apiClient.get('/api/profile');
         setProfileData(data);
+        
+        // Load saved profile data if available
+        if (data.user) {
+          const userData = data.user;
+          
+          // Set budget if available
+          if (userData.budget) {
+            setBudgetRange(userData.budget);
+          }
+          
+          // Set interests if available
+          if (userData.interests && Array.isArray(userData.interests)) {
+            setSelectedInterests(userData.interests);
+          }
+          
+          // Set profile picture if available
+          if (userData.profile_picture) {
+            const imageIndex = profileImages.findIndex(img => img.includes(userData.profile_picture));
+            if (imageIndex !== -1) {
+              setCurrentImageIndex(imageIndex);
+            }
+          }
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch profile');
       } finally {
@@ -120,131 +145,183 @@ export default function ProfilePage() {
 
   return (
     <ProtectedRoute>
-      <div className="bg-[linear-gradient(0deg,rgba(246,245,250,1)_0%,rgba(246,245,250,1)_100%)] w-full min-h-screen relative">
-        <main className="max-w-4xl mx-auto py-4 px-4">
-          <div className="bg-white rounded-[20px] border-2 border-solid border-[#d8dfe980] bg-gradient-to-b from-[rgba(216,223,233,0.25)] to-transparent p-6 shadow-lg">
+      <div className="bg-[linear-gradient(0deg,rgba(246,245,250,1)_0%,rgba(246,245,250,1)_100%)] w-full min-h-screen">
+        <div className="flex flex-col items-center justify-center min-h-screen py-8 px-4">
+          
+          {/* Navigation Buttons */}
+          <div className="mb-6 flex gap-4">
+            <button
+              onClick={() => router.push('/landing')}
+              className="px-6 py-3 bg-[#d8dfe9] hover:bg-gray-200 text-[#231f20] font-bold rounded-[25px] border border-solid border-black transition-colors [font-family:'Onest',Helvetica]"
+            >
+              ← Back to Landing
+            </button>
+            <button
+              onClick={() => router.push('/globe')}
+              className="px-6 py-3 bg-[#eeefa4] hover:bg-yellow-200 text-[#231f20] font-bold rounded-[25px] border border-solid border-black transition-colors [font-family:'Onest',Helvetica]"
+            >
+              🌍 Explore Globe
+            </button>
+          </div>
+          
+          {/* Main Content Card */}
+          <div className="w-full max-w-[500px] rounded-[50px] border-2 border-solid border-[#d8dfe980] bg-[linear-gradient(180deg,rgba(216,223,233,0.25)_0%,rgba(216,223,233,0)_100%)] p-6 shadow-lg">
             
-            {/* Profile Picture Selector */}
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold text-gray-800 mb-4" style={{fontFamily: 'Onest, sans-serif'}}>Choose Your Profile Picture</h2>
-              <div className="flex items-center space-x-6">
-                <button
-                  onClick={prevImage}
-                  className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-full transition-colors"
-                  aria-label="Previous image"
-                >
-                  ‹
-                </button>
-                
-                <div className="relative w-24 h-24 bg-gray-100 rounded-full overflow-hidden border-4 border-gray-300 flex items-center justify-center">
-                  <img
-                    src={profileImages[currentImageIndex]}
-                    alt={`Profile picture ${currentImageIndex + 1}`}
-                    className="w-16 h-16 object-contain"
-                  />
-                </div>
-                
-                <button
-                  onClick={nextImage}
-                  className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-full transition-colors"
-                  aria-label="Next image"
-                >
-                  ›
-                </button>
-              </div>
-              
-              <div className="mt-3">
-                <p className="text-sm text-gray-600">
-                  {currentImageIndex + 1} of {profileImages.length}
+            {/* User Info Section */}
+            {profileData && (
+              <div className="mb-6 text-center">
+                <h1 className="[font-family:'Onest',Helvetica] font-bold text-[#231f20] text-xl mb-1">
+                  {profileData.auth0_info.name}
+                </h1>
+                <p className="[font-family:'Onest',Helvetica] text-[#666] text-sm">
+                  {profileData.auth0_info.email}
                 </p>
-              </div>
-            </div>
-
-            {/* Error Display */}
-            {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-                <p className="text-red-600">Error: {error}</p>
               </div>
             )}
 
-            {/* Profile Data Display */}
-            {profileData && (
-              <div className="bg-gray-50 rounded-lg p-4 mb-6 text-left">
-                <h3 className="text-lg font-semibold text-gray-800 mb-3" style={{fontFamily: 'Onest, sans-serif'}}>User Information</h3>
-                <div className="space-y-2">
-                  <p className="text-base" style={{fontFamily: 'Onest, sans-serif'}}><span className="font-medium">Name:</span> {profileData.auth0_info.name}</p>
-                  <p className="text-base" style={{fontFamily: 'Onest, sans-serif'}}><span className="font-medium">Email:</span> {profileData.auth0_info.email}</p>
-                  <p className="text-base" style={{fontFamily: 'Onest, sans-serif'}}><span className="font-medium">Subject ID:</span> {profileData.auth0_info.sub}</p>
-                </div>
+            {/* Profile Picture Section - Now Inside */}
+            <div className="mb-8 flex items-center justify-center space-x-6">
+              <button
+                type="button"
+                onClick={prevImage}
+                aria-label="Previous"
+                className="inline-flex items-center justify-center px-4 py-3 bg-[#d8dfe9] rotate-180 rounded-[25px] border border-solid hover:bg-gray-200 transition-colors"
+              >
+                <span className="[font-family:'Onest',Helvetica] font-bold text-black text-[35px]">
+                  &gt;
+                </span>
+              </button>
+
+              <div className="w-28 h-28 flex items-center justify-center">
+                <img
+                  className="w-24 h-24 object-contain"
+                  alt="Turtle profile"
+                  src={profileImages[currentImageIndex]}
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={nextImage}
+                aria-label="Next"
+                className="inline-flex items-center justify-center px-4 py-3 bg-[#d8dfe9] rounded-[25px] border border-solid hover:bg-gray-200 transition-colors"
+              >
+                <span className="[font-family:'Onest',Helvetica] font-bold text-black text-[35px]">
+                  &gt;
+                </span>
+              </button>
+            </div>
+            
+            {/* Error Display */}
+            {error && (
+              <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+                <p className="text-red-600 [font-family:'Onest',Helvetica]">Error: {error}</p>
               </div>
             )}
 
             {/* Budget Section */}
             <div className="mb-6">
-              <label className="block text-lg font-medium text-gray-800 mb-3" style={{fontFamily: 'Onest, sans-serif'}}>
-                Budget <span className="text-red-500">*</span>
-              </label>
-              <div className="flex w-full max-w-md items-center px-5 py-2.5 bg-white rounded-[20px] border border-gray-300 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-200">
-                <span className="text-gray-500 mr-2">$</span>
-                <input
-                  type="text"
-                  value={budgetRange}
-                  onChange={handleBudgetChange}
-                  onBlur={validateBudget}
-                  placeholder="0-00000"
-                  className="flex-1 outline-none text-gray-800 placeholder-gray-400"
-                  style={{fontFamily: 'Onest, sans-serif'}}
-                  required
-                />
+              <div className="flex w-full items-center px-4 py-2 bg-white rounded-[20px] border border-black">
+                <div className="flex flex-col w-full">
+                  <span className="[font-family:'Onest',Helvetica] font-medium text-[#212121] text-lg mb-1">
+                    Budget
+                  </span>
+                  <input
+                    type="text"
+                    value={budgetRange}
+                    onChange={handleBudgetChange}
+                    onBlur={validateBudget}
+                    placeholder="$000-$0000"
+                    className="text-[#231f20] placeholder-[#a1a1a1] bg-transparent border-none outline-none w-full [font-family:'Onest',Helvetica] text-lg"
+                    required
+                  />
+                </div>
               </div>
               {budgetError && (
-                <p className="text-red-500 text-sm mt-2">{budgetError}</p>
+                <p className="mt-2 text-red-500 text-sm [font-family:'Onest',Helvetica]">
+                  {budgetError}
+                </p>
               )}
             </div>
 
             {/* Interests Section */}
             <div className="mb-6">
-              <h2 className="text-lg font-medium text-gray-800 mb-4" style={{fontFamily: 'Onest, sans-serif'}}>
+              <h2 className="[font-family:'Onest',Helvetica] font-medium text-black text-lg mb-4">
                 Pick your interests!
               </h2>
-              <div className="flex flex-wrap gap-3">
-                {interests.map((interest) => (
+              
+              {/* Interests Grid */}
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                {interests.slice(0, 3).map((interest) => (
                   <button
                     key={interest.id}
                     type="button"
                     onClick={() => toggleInterest(interest.label)}
-                    className={`inline-flex items-center justify-center px-5 py-2.5 rounded-[25px] border border-solid border-gray-800 overflow-hidden transition-colors ${
-                      isSelected(interest.label) ? "bg-[#eeefa4]" : "bg-transparent hover:bg-gray-100"
+                    className={`inline-flex items-center justify-center px-3 py-2 rounded-[25px] border border-solid border-black overflow-hidden transition-colors text-sm ${
+                      isSelected(interest.label) ? "bg-[#eeefa4]" : "hover:bg-gray-100"
                     }`}
-                    aria-pressed={isSelected(interest.label)}
                   >
-                    <span className="font-bold text-gray-800 text-lg">
+                    <span className="[font-family:'Onest',Helvetica] font-bold text-[#231f20] text-center">
                       {interest.label}
                     </span>
                   </button>
                 ))}
               </div>
+
+              {/* Fourth Interest Button */}
+              <button
+                type="button"
+                onClick={() => toggleInterest(interests[3].label)}
+                className={`inline-flex items-center justify-center px-3 py-2 rounded-[25px] border border-solid border-black overflow-hidden transition-colors text-sm w-full ${
+                  isSelected(interests[3].label) ? "bg-[#eeefa4]" : "hover:bg-gray-100"
+                }`}
+              >
+                <span className="[font-family:'Onest',Helvetica] font-bold text-[#231f20] text-center">
+                  {interests[3].label}
+                </span>
+              </button>
             </div>
 
             {/* Save Button */}
             <div className="text-center">
               <button
                 type="button"
-                onClick={() => {
+                onClick={async () => {
                   if (validateBudget()) {
-                    // Handle profile save logic here
-                    console.log('Profile saved with budget:', budgetRange);
-                    alert('Profile saved successfully!');
+                    try {
+                      // Prepare profile data
+                      const profileData = {
+                        budget: budgetRange,
+                        interests: selectedInterests,
+                        profile_picture: profileImages[currentImageIndex]
+                      };
+                      
+                      // Send to backend
+                      const response = await apiClient.put('/api/profile', profileData);
+                      
+                      if (response.status === 'success') {
+                        // Redirect to landing page after successful save
+                        router.push('/landing');
+                      } else {
+                        alert('Failed to save profile. Please try again.');
+                      }
+                    } catch (error) {
+                      console.error('Error saving profile:', error);
+                      alert('Failed to save profile. Please try again.');
+                    }
                   }
                 }}
-                className="bg-[#231f20] hover:bg-gray-800 text-white font-bold py-3 px-8 rounded-[25px] transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                className="w-full h-[60px] bg-[#231f20] border border-black items-center justify-center px-4 py-2 rounded-[25px] border-solid disabled:bg-gray-400 disabled:cursor-not-allowed hover:bg-gray-800 transition-colors"
                 disabled={!budgetRange.trim()}
               >
-                I&apos;m happy with my profile!
+                <span className="[font-family:'Onest',Helvetica] font-bold text-[#efefef] text-lg text-center">
+                  I&apos;m happy with my profile!
+                </span>
               </button>
             </div>
+
           </div>
-        </main>
+        </div>
       </div>
     </ProtectedRoute>
   );
