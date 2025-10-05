@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { apiClient } from '@/lib/api-client';
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 interface UserProfile {
   id: number;
@@ -24,6 +25,7 @@ interface ApiResponse {
 
 export default function ProfilePage() {
   const { user, isLoading } = useAuth();
+  const router = useRouter();
   const [profileData, setProfileData] = useState<ApiResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -236,7 +238,9 @@ export default function ProfilePage() {
                   if (validateBudget()) {
                     // Handle profile save logic here
                     console.log('Profile saved with budget:', budgetRange);
-                    alert('Profile saved successfully!');
+                    console.log('Selected interests:', selectedInterests);
+                    // Navigate to globe page
+                    router.push('/globe');
                   }
                 }}
                 className="bg-[#231f20] hover:bg-gray-800 text-white font-bold py-3 px-8 rounded-[25px] transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
