@@ -1,21 +1,24 @@
 'use client';
 
+import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { getAuth0LoginUrl, getAuth0LogoutUrl } from '@/lib/auth0';
+import LoadingPage from '@/components/LoadingPage';
 
 export default function LandingPage() {
   const { user, isLoading, logout } = useAuth();
   const router = useRouter();
+  const [isNavigatingToProfile, setIsNavigatingToProfile] = useState(false);
 
   const handleCreateProfile = () => {
-    // Redirect to login page
-    router.push('/login');
+    // Redirect directly to Auth0 login
+    window.location.href = getAuth0LoginUrl();
   };
 
   const handleLogin = () => {
-    // Redirect to login page
-    router.push('/login');
+    // Redirect directly to Auth0 login
+    window.location.href = getAuth0LoginUrl();
   };
 
   const handleLogout = () => {
@@ -28,14 +31,22 @@ export default function LandingPage() {
     router.push('/globe');
   };
 
+  const handleViewProfile = () => {
+    setIsNavigatingToProfile(true);
+    setTimeout(() => {
+      router.push('/profile');
+    }, 1500);
+  };
+
   if (isLoading) {
     return (
-      <div className="w-full h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-lg text-gray-600 font-medium">Loading...</p>
-        </div>
-      </div>
+      <LoadingPage message="Loading..." />
+    );
+  }
+
+  if (isNavigatingToProfile) {
+    return (
+      <LoadingPage message="Loading your profile..." />
     );
   }
 
@@ -72,7 +83,7 @@ export default function LandingPage() {
               <>
                 <button 
                   className="w-full sm:w-auto px-5 py-2.5 lg:px-6 lg:py-3 rounded-full bg-[#D8DFE9] text-[#212121] text-center font-['Onest'] text-sm lg:text-base font-bold cursor-pointer transition-all duration-300 hover:transform hover:-translate-y-1 hover:shadow-[0_4px_20px_0_#FFF]"
-                  onClick={() => router.push('/profile')}
+                  onClick={handleViewProfile}
                 >
                   View Profile
                 </button>

@@ -179,3 +179,5 @@ node_modules/
 htmlcov/
 .coverage
 coverage.xml
+
+backend/instance/travel_planner.db

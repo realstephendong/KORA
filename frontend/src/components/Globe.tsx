@@ -5,6 +5,7 @@ import React, { forwardRef, useImperativeHandle, useEffect, useRef } from 'react
 interface GlobeRef {
   zoomToCountry: (country: any) => void;
   selectCountry: (country: any, isSearchSelection?: boolean) => void;
+  enhancedZoomToCountry: (country: any) => void;
   resumeRotation: () => void;
   resetAppearance: () => void;
   resetView: () => void;
@@ -52,6 +53,39 @@ const GlobeComponent = forwardRef<GlobeRef, GlobeProps>(({ countriesData, onCoun
           
           // Zoom to country
           globeRef.current.pointOfView({ lat: centerLat, lng: centerLng, altitude: 1.5 }, 2000);
+        }
+      }
+    },
+    enhancedZoomToCountry: (country: any) => {
+      if (globeRef.current && country) {
+        // Calculate country center
+        const coordinates = country.geometry.coordinates;
+        let totalLat = 0, totalLng = 0, pointCount = 0;
+        
+        const processCoords = (coords: any) => {
+          if (Array.isArray(coords[0])) {
+            if (typeof coords[0][0] === 'number') {
+              coords.forEach((coord: any) => {
+                if (Array.isArray(coord) && coord.length >= 2) {
+                  totalLng += coord[0];
+                  totalLat += coord[1];
+                  pointCount++;
+                }
+              });
+            } else {
+              coords.forEach((subCoords: any) => processCoords(subCoords));
+            }
+          }
+        };
+        
+        processCoords(coordinates);
+        
+        if (pointCount > 0) {
+          const centerLat = totalLat / pointCount;
+          const centerLng = totalLng / pointCount;
+          
+          // Enhanced zoom with much closer altitude for dramatic transition effect
+          globeRef.current.pointOfView({ lat: centerLat, lng: centerLng, altitude: 0.3 }, 2000);
         }
       }
     },
@@ -109,40 +143,43 @@ const GlobeComponent = forwardRef<GlobeRef, GlobeProps>(({ countriesData, onCoun
               return 'rgba(207, 222, 203, 0.1)'; // Default land sides
             });
             
-            // Update the landmark indicator
-            globeRef.current.polygonLabel((d: any) => {
-              if (d === country) {
-                return `
-                  <div style="
-                    background: white;
-                    border-radius: 50%;
-                    width: 50px;
-                    height: 50px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    border: 4px solid #ff6b35;
-                    box-shadow: 0 6px 20px rgba(255, 107, 53, 0.4);
-                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                    font-size: 24px;
-                    font-weight: bold;
-                    color: #ff6b35;
-                    position: relative;
-                    animation: pulse 2s infinite;
-                  ">
-                    📍
-                  </div>
-                  <style>
-                    @keyframes pulse {
-                      0% { transform: scale(1); }
-                      50% { transform: scale(1.1); }
-                      100% { transform: scale(1); }
-                    }
-                  </style>
-                `;
-              }
-              return '';
-            });
+            // Update the landmark indicator - DISABLED
+            // globeRef.current.polygonLabel((d: any) => {
+            //   if (d === country) {
+            //     return `
+            //       <div style="
+            //         background: white;
+            //         border-radius: 50%;
+            //         width: 50px;
+            //         height: 50px;
+            //         display: flex;
+            //         align-items: center;
+            //         justify-content: center;
+            //         border: 4px solid #ff6b35;
+            //         box-shadow: 0 6px 20px rgba(255, 107, 53, 0.4);
+            //         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            //         font-size: 24px;
+            //         font-weight: bold;
+            //         color: #ff6b35;
+            //         position: relative;
+            //         animation: pulse 2s infinite;
+            //       ">
+            //         📍
+            //       </div>
+            //       <style>
+            //         @keyframes pulse {
+            //           0% { transform: scale(1); }
+            //           50% { transform: scale(1.1); }
+            //           100% { transform: scale(1); }
+            //         }
+            //       </style>
+            //     `;
+            //   }
+            //   return '';
+            // });
+            
+            // Disable polygon labels
+            globeRef.current.polygonLabel(() => '');
             
             // Only notify parent component if this is NOT a search selection
             // Search selections should show confirmation modal instead
@@ -162,7 +199,7 @@ const GlobeComponent = forwardRef<GlobeRef, GlobeProps>(({ countriesData, onCoun
     resumeRotation: () => {
       if (globeInstanceRef.current) {
         globeInstanceRef.current.controls().autoRotate = true;
-        globeInstanceRef.current.controls().autoRotateSpeed = 0.2;
+        globeInstanceRef.current.controls().autoRotateSpeed = 0.3;
       }
     },
     resetView: () => {
@@ -222,45 +259,48 @@ const GlobeComponent = forwardRef<GlobeRef, GlobeProps>(({ countriesData, onCoun
         globe.polygonStrokeColor(() => 'rgba(207, 222, 203, 0.3)'); // Land stroke color
         globe.polygonAltitude(() => 0.02); // Fixed: Set proper base altitude
         
-        // Landmark-style indicator for selected countries
-        globe.polygonLabel(({ properties: d }: any) => {
-          // Only show landmark for selected country
-          if (selectedCountryRef.current && d === selectedCountryRef.current) {
-            return `
-              <div style="
-                background: white;
-                border-radius: 50%;
-                width: 50px;
-                height: 50px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                border: 4px solid #ff6b35;
-                box-shadow: 0 6px 20px rgba(255, 107, 53, 0.4);
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                font-size: 24px;
-                font-weight: bold;
-                color: #ff6b35;
-                position: relative;
-                animation: pulse 2s infinite;
-              ">
-                📍
-              </div>
-              <style>
-                @keyframes pulse {
-                  0% { transform: scale(1); }
-                  50% { transform: scale(1.1); }
-                  100% { transform: scale(1); }
-                }
-              </style>
-            `;
-          }
-          return '';
-        });
+        // Landmark-style indicator for selected countries - DISABLED
+        // globe.polygonLabel(({ properties: d }: any) => {
+        //   // Only show landmark for selected country
+        //   if (selectedCountryRef.current && d === selectedCountryRef.current) {
+        //     return `
+        //       <div style="
+        //         background: white;
+        //         border-radius: 50%;
+        //         width: 50px;
+        //         height: 50px;
+        //         display: flex;
+        //         align-items: center;
+        //         justify-content: center;
+        //         border: 4px solid #ff6b35;
+        //         box-shadow: 0 6px 20px rgba(255, 107, 53, 0.4);
+        //         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        //         font-size: 24px;
+        //         font-weight: bold;
+        //         color: #ff6b35;
+        //         position: relative;
+        //         animation: pulse 2s infinite;
+        //       ">
+        //         📍
+        //       </div>
+        //       <style>
+        //         @keyframes pulse {
+        //           0% { transform: scale(1); }
+        //           50% { transform: scale(1.1); }
+        //           100% { transform: scale(1); }
+        //         }
+        //       </style>
+        //     `;
+        //   }
+        //   return '';
+        // });
+        
+        // Disable all polygon labels
+        globe.polygonLabel(() => '');
 
         // Smooth auto-rotate with gentle speed
         globe.controls().autoRotate = true;
-        globe.controls().autoRotateSpeed = 0.2;
+        globe.controls().autoRotateSpeed = 0.5;
         
         // Enhanced hover effects with smooth transitions
         globe.polygonsTransitionDuration(300);
@@ -334,40 +374,43 @@ const GlobeComponent = forwardRef<GlobeRef, GlobeProps>(({ countriesData, onCoun
                 return 'rgba(207, 222, 203, 0.1)'; // Default land sides
               });
               
-              // Add the landmark indicator
-              globe.polygonLabel((d: any) => {
-                if (d === clickedCountry) {
-                  return `
-                    <div style="
-                      background: white;
-                      border-radius: 50%;
-                      width: 50px;
-                      height: 50px;
-                      display: flex;
-                      align-items: center;
-                      justify-content: center;
-                      border: 4px solid #ff6b35;
-                      box-shadow: 0 6px 20px rgba(255, 107, 53, 0.4);
-                      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                      font-size: 24px;
-                      font-weight: bold;
-                      color: #ff6b35;
-                      position: relative;
-                      animation: pulse 2s infinite;
-                    ">
-                      📍
-                    </div>
-                    <style>
-                      @keyframes pulse {
-                        0% { transform: scale(1); }
-                        50% { transform: scale(1.1); }
-                        100% { transform: scale(1); }
-                      }
-                    </style>
-                  `;
-                }
-                return '';
-              });
+              // Add the landmark indicator - DISABLED
+              // globe.polygonLabel((d: any) => {
+              //   if (d === clickedCountry) {
+              //     return `
+              //       <div style="
+              //         background: white;
+              //         border-radius: 50%;
+              //         width: 50px;
+              //         height: 50px;
+              //         display: flex;
+              //         align-items: center;
+              //         justify-content: center;
+              //         border: 4px solid #ff6b35;
+              //         box-shadow: 0 6px 20px rgba(255, 107, 53, 0.4);
+              //         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+              //         font-size: 24px;
+              //         font-weight: bold;
+              //         color: #ff6b35;
+              //         position: relative;
+              //         animation: pulse 2s infinite;
+              //       ">
+              //         📍
+              //       </div>
+              //       <style>
+              //         @keyframes pulse {
+              //           0% { transform: scale(1); }
+              //           50% { transform: scale(1.1); }
+              //           100% { transform: scale(1); }
+              //         }
+              //       </style>
+              //     `;
+              //   }
+              //   return '';
+              // });
+              
+              // Disable polygon labels
+              globe.polygonLabel(() => '');
             }
             
             onCountrySelected(clickedCountry);
