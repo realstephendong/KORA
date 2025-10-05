@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import CountrySearch from '@/components/CountrySearch';
 import TravelModal from '@/components/TravelModal';
-import CountryConfirmationModal from '@/components/CountryConfirmationModal';
+import CountryBubble from '@/components/CountryBubble';
 
 // Dynamically import Globe to avoid SSR issues
 const Globe = dynamic(() => import('@/components/Globe'), { ssr: false });
@@ -56,28 +56,36 @@ export default function GlobePage() {
 
   const handleCountrySelect = (country: Country) => {
     if (globeRef.current && country) {
+      console.log('handleCountrySelect called - setting isSearchSelection to true');
       // This is a search-based selection, so we need confirmation
       setIsSearchSelection(true);
       setSelectedCountry(country);
-      globeRef.current.selectCountry(country);
+      globeRef.current.selectCountry(country, true);
       console.log('Search selecting and zooming to country:', country.properties.ADMIN || country.properties.NAME);
       
-      // Show confirmation modal after zoom completes
-      setTimeout(() => {
-        setShowConfirmationModal(true);
-      }, 2500);
+      // Show confirmation modal immediately
+      console.log('Showing confirmation modal');
+      setShowConfirmationModal(true);
     }
   };
 
   const handleCountrySelected = (country: Country) => {
-    // This is a direct click on the globe, so no confirmation needed
+    console.log('handleCountrySelected called, isSearchSelection:', isSearchSelection);
+    
+    // Only proceed if this is NOT a search selection
+    if (isSearchSelection) {
+      console.log('Ignoring handleCountrySelected for search selection');
+      return;
+    }
+    
+    // This is a direct click on the globe, show bubble for confirmation
     setIsSearchSelection(false);
     setSelectedCountry(country);
     console.log('Direct click on country:', country.properties.ADMIN || country.properties.NAME);
     
-    // Store the country and transition immediately
-    storeSelectedCountry(country);
-    transitionToWhitePage();
+    // Show bubble for direct clicks immediately
+    console.log('Showing bubble for direct click');
+    setShowConfirmationModal(true);
   };
 
   const storeSelectedCountry = (country: Country) => {
@@ -109,12 +117,15 @@ export default function GlobePage() {
   };
 
   const handleCancelCountry = () => {
+    console.log('Cancelling country selection - resetting globe appearance');
     setShowConfirmationModal(false);
     setSelectedCountry(null);
     setIsSearchSelection(false);
-    // Reset globe view
+    // Reset globe view, appearance, and resume rotation
     if (globeRef.current) {
-      globeRef.current.pointOfView({ altitude: 1.8 }, 2000);
+      globeRef.current.resetView();
+      globeRef.current.resetAppearance();
+      globeRef.current.resumeRotation();
     }
   };
 
@@ -154,6 +165,7 @@ export default function GlobePage() {
           ref={globeRef} 
           countriesData={countriesData} 
           onCountrySelected={handleCountrySelected}
+          isSearchSelection={isSearchSelection}
         />
       </div>
 
@@ -165,8 +177,8 @@ export default function GlobePage() {
         />
       </div>
 
-      {/* Country Confirmation Modal */}
-      <CountryConfirmationModal
+      {/* Country Bubble */}
+      <CountryBubble
         country={selectedCountry!}
         onConfirm={handleConfirmCountry}
         onCancel={handleCancelCountry}
