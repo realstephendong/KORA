@@ -427,7 +427,6 @@ const GlobeComponent = forwardRef<GlobeRef, GlobeProps>(({ countriesData, onCoun
       style={{ 
         width: '100%', 
         height: '100%',
-        borderRadius: '16px',
         overflow: 'hidden',
         background: '#ffffff'
       }}

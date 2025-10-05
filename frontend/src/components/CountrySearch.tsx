@@ -71,19 +71,19 @@ const CountrySearch: React.FC<CountrySearchProps> = ({
 
   return (
     <div ref={searchRef} className="relative w-96">
-      <div className="flex items-center bg-white/95 rounded-xl shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-105">
+      <div className="flex items-center bg-white/95 rounded-full shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-105">
         <input
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => setShowResults(filteredCountries.length > 0)}
           placeholder="Search for a country..."
-          className="flex-1 px-4 py-4 text-base font-medium outline-none bg-transparent rounded-l-xl"
+          className="flex-1 px-4 py-4 text-base font-medium outline-none bg-transparent rounded-l-full"
         />
         
         <button
           onClick={handleFeelingLucky}
-          className="px-4 py-4 bg-gray-100 text-gray-600 rounded-r-xl font-medium transition-all duration-200 hover:bg-gray-200 hover:text-gray-800 border-l border-gray-200"
+          className="px-4 py-4 bg-gray-100 text-gray-600 rounded-r-full font-medium transition-all duration-200 hover:bg-gray-200 hover:text-gray-800 border-l border-gray-200"
         >
           🎲
         </button>

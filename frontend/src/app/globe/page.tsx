@@ -180,12 +180,50 @@ export default function GlobePage() {
         />
       </div>
 
-      {/* Top Left Search Bar */}
+      {/* Top Left Search Bar and Back Button */}
       <div className={`absolute top-5 left-5 z-10 transition-opacity duration-600 ease-in-out ${isFadingOut ? 'opacity-0' : 'opacity-100'}`}>
-        <CountrySearch
-          countries={countries}
-          onCountrySelect={handleCountrySelect}
-        />
+        <div className="flex gap-3">
+          {/* Back Button */}
+          <button
+            onClick={() => router.push('/landing')}
+            className="bg-transparent hover:bg-black/10 text-gray-800 font-semibold py-4 px-8 transition-all duration-300 flex items-center gap-3"
+          >
+            <img 
+              src="Group 4.svg"
+              alt="Back"
+              className="w-8 h-8"
+            />
+          </button>
+          
+          {/* Search Bar */}
+          <CountrySearch
+            countries={countries}
+            onCountrySelect={handleCountrySelect}
+          />
+        </div>
+      </div>
+
+      {/* Profile Button - Top Right */}
+      <div className={`absolute top-5 right-5 z-10 transition-opacity duration-600 ease-in-out ${isFadingOut ? 'opacity-0' : 'opacity-100'}`}>
+        <button
+          onClick={() => router.push('/profile')}
+          className="bg-white/90 hover:bg-white text-gray-800 font-semibold py-3 px-6 rounded-full shadow-lg border border-gray-200 transition-all duration-300 hover:shadow-xl flex items-center gap-2"
+        >
+          <svg 
+            className="w-5 h-5" 
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+          >
+            <path 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              strokeWidth={2} 
+              d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" 
+            />
+          </svg>
+          Profile
+        </button>
       </div>
 
       {/* Country Bubble */}

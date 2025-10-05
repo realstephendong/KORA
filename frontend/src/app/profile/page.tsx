@@ -1,6 +1,7 @@
 'use client';
 
 import { useAuth } from '@/contexts/AuthContext';
+import { useRouter } from 'next/navigation';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { apiClient } from '@/lib/api-client';
 import { useEffect, useState } from 'react';
@@ -31,6 +32,8 @@ export default function ProfilePage() {
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [budgetRange, setBudgetRange] = useState("");
   const [budgetError, setBudgetError] = useState("");
+
+  const router = useRouter();
 
   const interests = [
     { id: 1, label: "Fashion" },
@@ -233,6 +236,7 @@ export default function ProfilePage() {
                 onClick={() => {
                   if (validateBudget()) {
                     // Handle profile save logic here
+                    router.push('/globe');
                     console.log('Profile saved with budget:', budgetRange);
                     alert('Profile saved successfully!');
                   }

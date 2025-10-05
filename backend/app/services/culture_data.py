@@ -16,11 +16,82 @@ import json
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def fetch_events(itinerary: List[str]) -> Dict[str, Any]:
+def fetch_place_information(places: List[str]) -> Dict[str, Any]:
     """
-    Get events for a given itinerary.
+    Get place information using Google Places API.
+    
+    Args:
+        places (List[str]): List of places to search for
+        
+    Returns:
+        Dict[str, Any]: Place information with details
     """
-    return fetch_events(itinerary)
+    try:
+        api_key = os.environ.get('GOOGLE_API_KEY')
+        if not api_key:
+            logger.error("GOOGLE_API_KEY environment variable is required")
+            return {}
+        
+        url = "https://places.googleapis.com/v1/places:searchText"
+        headers = {
+            'Content-Type': 'application/json',
+            'X-Goog-Api-Key': api_key,
+            'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.priceLevel,places.rating,places.userRatingCount,places.types,places.location,places.websiteUri,places.phoneNumber'
+        }
+        
+        results = {}
+        
+        for place in places:
+            # Create search query for the place
+            search_query = f"{place} tourist attraction"
+            
+            payload = {
+                "textQuery": search_query
+            }
+            
+            logger.info(f"Searching for place information: {place}")
+            response = requests.post(url, headers=headers, json=payload, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                if 'places' in data and len(data['places']) > 0:
+                    place_data = data['places'][0]  # Get the first result
+                    
+                    # Extract place information
+                    place_info = {
+                        'name': place_data.get('displayName', {}).get('text', place),
+                        'address': place_data.get('formattedAddress', 'Address not available'),
+                        'price_level': place_data.get('priceLevel', 'Price level not available'),
+                        'rating': place_data.get('rating', 'Rating not available'),
+                        'user_rating_count': place_data.get('userRatingCount', 0),
+                        'types': place_data.get('types', []),
+                        'location': place_data.get('location', {}),
+                        'website': place_data.get('websiteUri', 'Website not available'),
+                        'phone': place_data.get('phoneNumber', 'Phone not available')
+                    }
+                    
+                    results[place] = place_info
+                    logger.info(f"Found place information for: {place}")
+                else:
+                    logger.warning(f"No places found for: {place}")
+                    results[place] = {'error': 'No places found'}
+            else:
+                logger.error(f"Google Places API error for {place}: {response.status_code} - {response.text}")
+                results[place] = {'error': f'API error: {response.status_code}'}
+        
+        return {
+            'places': results,
+            'total_places_searched': len(places),
+            'successful_searches': len([r for r in results.values() if 'error' not in r])
+        }
+        
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error fetching place information from Google Places API: {str(e)}")
+        return {'error': f'Request error: {str(e)}'}
+    except Exception as e:
+        logger.error(f"Unexpected error fetching place information: {str(e)}")
+        return {'error': f'Unexpected error: {str(e)}'}
 
 def fetch_images(places: List[str]) -> Dict[str, Any]:
     """
@@ -42,7 +113,7 @@ def fetch_images(places: List[str]) -> Dict[str, Any]:
         headers = {
             'Content-Type': 'application/json',
             'X-Goog-Api-Key': api_key,
-            'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.priceLevel,places.photos,places.rating,places.userRatingCount,places.types'
+            'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.priceLevel,places.photos,places.rating,places.userRatingCount,places.types,places.location'
         }
         
         results = {}
