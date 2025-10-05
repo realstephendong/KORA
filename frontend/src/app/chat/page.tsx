@@ -1,172 +1,119 @@
-'use client';
+import React, { useState } from "react";
 
-import { useState, useRef, useEffect } from 'react';
-import ProtectedRoute from '@/components/ProtectedRoute';
-import { apiClient } from '@/lib/api-client';
-import { useAuth } from '@/contexts/AuthContext';
+export const Chatbox = () => {
+  const [inputValue, setInputValue] = useState("");
+  const [location, setLocation] = useState("France");
 
-interface ChatMessage {
-  role: 'human' | 'ai';
-  content: string;
-}
-
-interface ApiResponse {
-  response: string;
-  intermediate_steps: any[];
-  success: boolean;
-  timestamp: string;
-  error?: string;
-}
-
-export default function ChatPage() {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [inputMessage, setInputMessage] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInputValue(e.target.value);
   };
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+  const handleSubmit = () => {
+    if (inputValue.trim()) {
+      console.log("Submitted:", inputValue);
+      setInputValue("");
+    }
+  };
 
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inputMessage.trim() || isLoading) return;
-
-    const userMessage: ChatMessage = {
-      role: 'human',
-      content: inputMessage.trim()
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    setInputMessage('');
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const response: ApiResponse = await apiClient.post('/api/chat/message', {
-        message: userMessage.content,
-        chat_history: messages
-      });
-
-      const aiMessage: ChatMessage = {
-        role: 'ai',
-        content: response.response
-      };
-
-      setMessages(prev => [...prev, aiMessage]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to send message');
-    } finally {
-      setIsLoading(false);
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      handleSubmit();
     }
   };
 
   return (
-    <ProtectedRoute>
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-        <div className="max-w-4xl mx-auto h-screen flex flex-col">
-          {/* Header */}
-          <div className="bg-white shadow-sm border-b border-gray-200 p-4">
-            <div className="flex items-center justify-between">
-              <h1 className="text-2xl font-bold text-gray-800">Travel Planning Assistant</h1>
-              <div className="flex gap-2">
-                <a 
-                  href="/profile" 
-                  className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
-                >
-                  Profile
-                </a>
-                <a 
-                  href="/globe" 
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  Globe
-                </a>
-                <a 
-                  href="/api/auth/logout" 
-                  className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
-                >
-                  Logout
-                </a>
-              </div>
-            </div>
+    <div className="bg-[linear-gradient(0deg,rgba(246,245,250,1)_0%,rgba(246,245,250,1)_100%)] w-full min-w-[1920px] min-h-[1316px] relative">
+      <main className="absolute top-[39px] left-0 w-[1920px] h-[1214px] rounded-[50px] overflow-hidden border-2 border-solid border-[#d8dfe980] bg-[linear-gradient(180deg,rgba(216,223,233,0.25)_0%,rgba(216,223,233,0)_100%),linear-gradient(0deg,rgba(246,245,250,1)_0%,rgba(246,245,250,1)_100%)]">
+        <section
+          className="absolute top-[294px] left-[482px] w-[955px] h-[498px] rounded-[40px] overflow-hidden border-2 border-solid border-[#d8dfe9] bg-[linear-gradient(180deg,rgba(216,223,233,0)_0%,rgba(218,224,234,0.3)_100%),linear-gradient(0deg,rgba(239,240,164,0)_0%,rgba(239,240,164,0)_100%)]"
+          aria-label="Chat conversation"
+        >
+          <div className="inline-flex items-center justify-center gap-2.5 p-[15px] absolute top-[363px] left-[282px] rounded-[25px] overflow-hidden border border-solid border-black">
+            <p className="relative w-fit mt-[-0.50px] [font-family:'Onest-Medium',Helvetica] font-medium text-black text-xl tracking-[0] leading-[normal]">
+              What cities are you interested in?
+            </p>
           </div>
 
-          {/* Messages Container */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {messages.length === 0 && (
-              <div className="text-center text-gray-500 mt-8">
-                <h3 className="text-xl font-semibold mb-2">Welcome to Kora!</h3>
-                <p>Start planning your sustainable travel adventure. Tell me where you'd like to go!</p>
-              </div>
-            )}
+          <div className="absolute top-[420px] left-0 w-[955px] h-[78px] bg-[#486a9b]" />
+        </section>
 
-            {messages.map((message, index) => (
-              <div
-                key={index}
-                className={`flex ${message.role === 'human' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div
-                  className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                    message.role === 'human'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-white text-gray-800 shadow-sm border border-gray-200'
-                  }`}
-                >
-                  <p className="text-sm">{message.content}</p>
-                </div>
-              </div>
-            ))}
+        <div className="absolute top-[818px] left-[482px] w-[955px] h-[102px] flex gap-[387px] rounded-[50px] overflow-hidden border-2 border-solid border-[#d8dfe980] bg-[linear-gradient(180deg,rgba(216,223,233,0.25)_0%,rgba(216,223,233,0)_100%),linear-gradient(0deg,rgba(255,255,255,0.2)_0%,rgba(255,255,255,0.2)_100%)]">
+          <label htmlFor="chat-input" className="sr-only">
+            Ask Kora anything about your travel plans
+          </label>
+          <input
+            id="chat-input"
+            type="text"
+            value={inputValue}
+            onChange={handleInputChange}
+            onKeyPress={handleKeyPress}
+            placeholder="Ask Kora anything about your travel plans"
+            className="mt-[38px] w-[454px] h-[26px] ml-[45px] [font-family:'Onest-Light',Helvetica] font-light text-variable-collection-grey text-xl tracking-[0] leading-[normal] bg-transparent placeholder:text-variable-collection-grey"
+            aria-label="Chat input"
+          />
 
-            {isLoading && (
-              <div className="flex justify-start">
-                <div className="bg-white text-gray-800 shadow-sm border border-gray-200 max-w-xs lg:max-w-md px-4 py-2 rounded-lg">
-                  <div className="flex items-center space-x-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                    <p className="text-sm">Thinking...</p>
-                  </div>
-                </div>
-              </div>
-            )}
+          <button
+            onClick={handleSubmit}
+            className="mt-[31px] w-10 h-10 flex bg-variable-collection-black rounded-[20px] cursor-pointer hover:opacity-90 transition-opacity"
+            aria-label="Send message"
+            type="button"
+          >
+            <img
+              className="mt-2 w-6 h-6 ml-2 aspect-[1]"
+              alt=""
+              src="/chat/arrowButton.svg"
+            />
+          </button>
+        </div>
 
-            {error && (
-              <div className="flex justify-center">
-                <div className="bg-red-50 border border-red-200 rounded-lg p-3 max-w-md">
-                  <p className="text-red-600 text-sm">Error: {error}</p>
-                </div>
-              </div>
-            )}
+        <img
+          className="absolute w-[3.23%] h-[5.11%] top-[3.05%] left-[94.22%]"
+          alt="Menu"
+          src="/chat/arrowButton.svg"
+        />
+      </main>
 
-            <div ref={messagesEndRef} />
-          </div>
+      <img
+        className="absolute top-[77px] left-[89px] w-[74px] h-[73px]"
+        alt="Kora logo"
+        src="/chat/sea turtle-02 2.svg"
+      />
 
-          {/* Input Form */}
-          <div className="bg-white border-t border-gray-200 p-4">
-            <form onSubmit={handleSendMessage} className="flex gap-2">
-              <input
-                type="text"
-                value={inputMessage}
-                onChange={(e) => setInputMessage(e.target.value)}
-                placeholder="Tell me about your travel plans..."
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                disabled={isLoading}
-              />
-              <button
-                type="submit"
-                disabled={!inputMessage.trim() || isLoading}
-                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-              >
-                {isLoading ? 'Sending...' : 'Send'}
-              </button>
-            </form>
+      <div className="flex w-[606px] items-center justify-between pl-10 pr-2.5 py-2.5 absolute top-[82px] left-[659px] bg-white rounded-[40px] overflow-hidden border-[none] before:content-[''] before:absolute before:inset-0 before:p-[5px] before:rounded-[40px] before:[background:linear-gradient(1deg,rgba(238,239,164,0)_0%,rgba(238,239,164,1)_100%)] before:[-webkit-mask:linear-gradient(#fff_0_0)_content-box,linear-gradient(#fff_0_0)] before:[-webkit-mask-composite:xor] before:[mask-composite:exclude] before:z-[1] before:pointer-events-none">
+        <div className="inline-flex items-center gap-2.5 relative flex-[0_0_auto]">
+          <img
+            className="relative w-6 h-6 aspect-[1]"
+            alt=""
+            src="/chat/arrowButton.svg"
+          />
+
+          <div className="relative w-fit mt-[-1.00px] [font-family:'Onest-Medium',Helvetica] font-medium text-variable-collection-black text-xl tracking-[0] leading-[normal]">
+            {location}
           </div>
         </div>
+
+        <button
+          className="relative w-10 h-10 bg-variable-collection-black rounded-[20px] cursor-pointer hover:opacity-90 transition-opacity"
+          aria-label="Search location"
+          type="button"
+        >
+          <div className="relative top-2 left-[9px] w-[21px] h-[25px]">
+            <div className="absolute top-0 left-0 w-[19px] h-[19px] bg-variable-collection-black rounded-[9.43px] border-[1.5px] border-solid border-white" />
+
+            <img
+              className="absolute top-[15px] left-3 w-[9px] h-2.5"
+              alt=""
+              src="/chat/arrowButton.svg"
+            />
+          </div>
+        </button>
       </div>
-    </ProtectedRoute>
+
+      <img
+        className="absolute top-[593px] left-[527px] w-[230px] h-[186px]"
+        alt="Kora character illustration"
+        src="/chat/sea zine-03 1.svg"
+      />
+    </div>
   );
-}
+};
