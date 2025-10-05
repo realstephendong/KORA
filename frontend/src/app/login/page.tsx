@@ -23,8 +23,7 @@ export default function LoginPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Note: This form is for UI purposes only
-    // Auth0 handles the actual authentication
+    // This form is for UI purposes only - Auth0 handles authentication
     // Redirect to Auth0 login
     window.location.href = getAuth0LoginUrl();
   };

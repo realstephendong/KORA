@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { motion } from 'framer-motion';
 
 interface CountryBubbleProps {
   country: {
@@ -30,74 +31,55 @@ const CountryBubble: React.FC<CountryBubbleProps> = ({
       {/* Floating Bubble positioned in center-right */}
       <div className="absolute top-1/2 right-8 transform -translate-y-1/2 pointer-events-auto">
         <div className="relative">
-          {/* Main Bubble */}
-          <div className="bg-white rounded-3xl shadow-2xl p-6 max-w-sm w-80 transform transition-all duration-700 animate-in slide-in-from-right-8 fade-in-0 scale-100" style={{boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 107, 53, 0.1)'}}>
-            {/* Pulsing Ring Animation - matching globe colors */}
-            <div className="absolute -inset-2 rounded-3xl opacity-20 animate-ping" style={{background: '#F2F37F'}}></div>
-            <div className="absolute -inset-1 rounded-3xl opacity-30 animate-pulse" style={{background: '#ff6b35'}}></div>
-            
-            {/* Bubble Content */}
-            <div className="relative z-10">
-              {/* Country Header with Flag */}
-              <div className="flex items-center mb-4">
-                <div className="w-10 h-10 rounded-full flex items-center justify-center shadow-lg mr-3" style={{background: 'linear-gradient(135deg, #ff6b35, #F2F37F)'}}>
-                  <span className="text-lg">🌍</span>
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-gray-900" style={{fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'}}>
-                    {countryName}
-                  </h3>
-                  <p className="text-sm text-gray-500" style={{fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'}}>Ready to explore?</p>
-                </div>
+          {/* Main Bubble - New Design with Framer Motion */}
+          <motion.div 
+            className="relative w-[387px] min-h-[216px] max-h-[320px] rounded-[50px] overflow-hidden border border-gray-200 shadow-lg backdrop-blur-sm flex flex-col"
+            style={{
+              background: 'linear-gradient(330deg,rgba(216,223,233,0)_0%,rgba(216,223,233,1)_100%),linear-gradient(0deg,rgba(246,245,250,1)_0%,rgba(246,245,250,1)_100%)'
+            }}
+            animate={{
+              y: [-10, -20, -15, -25, -12, -18, -22, -8, -16, -10],
+              x: [-8, 6, -4, 10, -6, 4, -10, 8, -3, 0],
+              rotate: [0.5, -0.4, 0.6, -0.5, 0.2, -0.6, 0.4, -0.2, 0.5, 0]
+            }}
+            transition={{
+              duration: 12,
+              repeat: Infinity,
+              ease: "easeInOut"
+            }}
+          >
+            {/* Content Container */}
+            <div className="flex-1 flex flex-col justify-center px-[43px] pt-6">
+              {/* "you're going to" text */}
+              <div className="font-medium text-black text-xl tracking-[0] leading-[normal]" style={{fontFamily: 'Onest, Helvetica, sans-serif'}}>
+                you're going to
               </div>
 
-              {/* Floating Particles - matching globe colors */}
-              <div className="absolute -top-2 -right-2 w-3 h-3 rounded-full animate-bounce" style={{background: '#F2F37F'}}></div>
-              <div className="absolute -bottom-1 -left-1 w-2 h-2 rounded-full animate-bounce" style={{background: '#ff6b35', animationDelay: '0.5s'}}></div>
-              <div className="absolute top-2 -left-3 w-2 h-2 rounded-full animate-bounce" style={{background: '#CFDECB', animationDelay: '1s'}}></div>
-
-              {/* Content */}
-              <div className="mb-4">
-                <p className="text-gray-600 text-sm leading-relaxed" style={{fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'}}>
-                  Is this your destination? We'll help you plan an amazing journey here.
-                </p>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex gap-2">
-                <button
-                  onClick={onCancel}
-                  className="flex-1 px-3 py-2 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200 transition-all duration-200"
-                  style={{fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'}}
-                >
-                  Not Quite
-                </button>
-                <button
-                  onClick={onConfirm}
-                  className="flex-1 px-3 py-2 text-white rounded-xl text-sm font-medium transition-all duration-200 shadow-lg hover:shadow-xl"
-                  style={{background: 'linear-gradient(135deg, #ff6b35, #F2F37F)', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'}}
-                >
-                  Let's Go! ✈️
-                </button>
+              {/* Country name */}
+              <div className="font-black text-black text-[clamp(28px,4.5vw,50px)] tracking-[0] leading-tight break-words" style={{fontFamily: 'Onest, Helvetica, sans-serif'}}>
+                {countryName}
               </div>
             </div>
-          </div>
 
-          {/* Floating Tail/Connector */}
-          <div className="absolute -left-4 top-1/2 transform -translate-y-1/2">
-            <div className="w-8 h-8 bg-white rounded-full shadow-lg flex items-center justify-center">
-              <div className="w-3 h-3 rounded-full animate-pulse" style={{background: '#ff6b35'}}></div>
+            {/* Action Buttons Container */}
+            <div className="flex justify-start items-center gap-6 px-8 pb-8">
+              <button
+                onClick={onCancel}
+                className="px-6 py-3 border border-[#d8dfe9] bg-[#eeefa4] text-black rounded-full font-bold hover:bg-[#e6e794] hover:shadow-lg hover:scale-105 transition-all duration-200 text-sm"
+                style={{fontFamily: 'Onest, Helvetica, sans-serif'}}
+              >
+                Not quite
+              </button>
+              
+              <button
+                onClick={onConfirm}
+                className="px-6 py-3 bg-black text-white rounded-full font-bold hover:bg-gray-800 hover:shadow-lg hover:scale-105 transition-all duration-200 text-sm"
+                style={{fontFamily: 'Onest, Helvetica, sans-serif'}}
+              >
+                Yes, proceed!
+              </button>
             </div>
-          </div>
-
-          {/* Animated Dots Trail */}
-          <div className="absolute -left-8 top-1/2 transform -translate-y-1/2">
-            <div className="flex space-x-1">
-              <div className="w-1 h-1 rounded-full animate-bounce" style={{background: '#F2F37F'}}></div>
-              <div className="w-1 h-1 rounded-full animate-bounce" style={{background: '#ff6b35', animationDelay: '0.2s'}}></div>
-              <div className="w-1 h-1 rounded-full animate-bounce" style={{background: '#CFDECB', animationDelay: '0.4s'}}></div>
-            </div>
-          </div>
+          </motion.div>
         </div>
       </div>
     </div>

@@ -41,7 +41,7 @@ class Itinerary(db.Model):
                           onupdate=db.func.current_timestamp())
     
     # Relationship
-    user = db.relationship('User', backref=db.backref('itineraries', lazy=True))
+    user = db.relationship('User', backref=db.backref('itineraries', lazy=True), foreign_keys=[user_id])
     
     def __repr__(self):
         """String representation of the Itinerary model."""

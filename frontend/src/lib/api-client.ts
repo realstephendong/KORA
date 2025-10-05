@@ -1,4 +1,5 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export class ApiClient {
   private baseUrl: string;
@@ -86,3 +87,29 @@ export const apiClient = new ApiClient();
 export function setupApiClient(getToken: () => string | null) {
   apiClient.setTokenProvider(getToken);
 }
+
+// Debug API methods
+export const debugApi = {
+  // Test authentication
+  async testAuth(): Promise<any> {
+    return apiClient.get('/api/debug/auth');
+  }
+};
+
+// Itinerary-related API methods
+export const itineraryApi = {
+  // Get all itineraries for the current user
+  async getAllItineraries(): Promise<any> {
+    return apiClient.get('/api/itineraries');
+  },
+
+  // Get a specific itinerary by ID
+  async getItinerary(itineraryId: number): Promise<any> {
+    return apiClient.get(`/api/itineraries/${itineraryId}`);
+  },
+
+  // Export itinerary as structured JSON for visualization
+  async exportItinerary(itineraryId: number): Promise<any> {
+    return apiClient.get(`/api/itineraries/${itineraryId}/export`);
+  }
+};

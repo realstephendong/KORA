@@ -27,7 +27,7 @@ export default function GlobePage() {
   const [showTravelModal, setShowTravelModal] = useState(false);
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [isSearchSelection, setIsSearchSelection] = useState(false);
-  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [isFadingOut, setIsFadingOut] = useState(false);
   const globeRef = useRef<any>(null);
   const router = useRouter();
 
@@ -100,12 +100,23 @@ export default function GlobePage() {
   };
 
   const transitionToWhitePage = () => {
-    setIsTransitioning(true);
-    
-    // Add a smooth transition effect
-    setTimeout(() => {
+    if (globeRef.current && selectedCountry) {
+      // Use the enhanced zoom method for smoother transition
+      globeRef.current.enhancedZoomToCountry(selectedCountry);
+      
+      // Start fade-out effect while zoom is still happening
+      setTimeout(() => {
+        setIsFadingOut(true);
+      }, 800); // Start fade while zoom is still in progress
+      
+      // Navigate after zoom and fade complete
+      setTimeout(() => {
+        router.push('/chat');
+      }, 2000); // Match the zoom duration
+    } else {
+      // Fallback if no globe or country
       router.push('/chat');
-    }, 1000);
+    }
   };
 
   const handleConfirmCountry = () => {
@@ -160,7 +171,7 @@ export default function GlobePage() {
   return (
     <div className="relative w-full h-screen overflow-hidden bg-white">
       {/* Background Globe */}
-      <div className={`absolute inset-0 z-0 transition-all duration-1000 ${isTransitioning ? 'opacity-0 scale-110' : 'opacity-100 scale-100'}`}>
+      <div className={`absolute inset-0 z-0 transition-opacity duration-600 ease-in-out ${isFadingOut ? 'opacity-0' : 'opacity-100'}`}>
         <Globe 
           ref={globeRef} 
           countriesData={countriesData} 
@@ -170,7 +181,7 @@ export default function GlobePage() {
       </div>
 
       {/* Top Left Search Bar */}
-      <div className="absolute top-5 left-5 z-10">
+      <div className={`absolute top-5 left-5 z-10 transition-opacity duration-600 ease-in-out ${isFadingOut ? 'opacity-0' : 'opacity-100'}`}>
         <CountrySearch
           countries={countries}
           onCountrySelect={handleCountrySelect}
@@ -178,22 +189,15 @@ export default function GlobePage() {
       </div>
 
       {/* Country Bubble */}
-      <CountryBubble
-        country={selectedCountry!}
-        onConfirm={handleConfirmCountry}
-        onCancel={handleCancelCountry}
-        isVisible={showConfirmationModal}
-      />
+      <div className={`transition-opacity duration-600 ease-in-out ${isFadingOut ? 'opacity-0' : 'opacity-100'}`}>
+        <CountryBubble
+          country={selectedCountry!}
+          onConfirm={handleConfirmCountry}
+          onCancel={handleCancelCountry}
+          isVisible={showConfirmationModal}
+        />
+      </div>
 
-      {/* Transition Overlay */}
-      {isTransitioning && (
-        <div className="fixed inset-0 z-50 bg-white flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-xl text-gray-600 font-medium">Preparing your journey...</p>
-          </div>
-        </div>
-      )}
 
     </div>
   );
