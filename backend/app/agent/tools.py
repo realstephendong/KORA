@@ -7,8 +7,9 @@ from typing import List, Dict, Any, Union
 import logging
 from langchain.tools import tool
 from app.services.geo_api import fetch_cities_for_country
-from app.services.travel_data_api import fetch_points_of_interest, fetch_distance_between_cities, fetch_hotel_price, fetch_hotels_in_city
-from app.services.culture_data import fetch_itinerary_list, fetch_cultural_insights
+from app.services.travel_data_api import fetch_points_of_interest, fetch_distance_between_cities
+from app.services.hotels import fetch_hotel_price, fetch_hotels_in_city
+from app.services.culture_data import fetch_cultural_insights
 from app.models.itinerary import Itinerary
 from app import db
 
