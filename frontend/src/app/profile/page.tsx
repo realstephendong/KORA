@@ -28,8 +28,9 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  const [selectedInterests, setSelectedInterests] = useState([]);
-  const [budgetRange, setBudgetRange] = useState("$000-$0000");
+  const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
+  const [budgetRange, setBudgetRange] = useState("");
+  const [budgetError, setBudgetError] = useState("");
 
   const interests = [
     { id: 1, label: "Fashion" },
@@ -47,6 +48,29 @@ export default function ProfilePage() {
   };
 
   const isSelected = (label: string) => selectedInterests.includes(label);
+
+  // Budget validation
+  const handleBudgetChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    // Only allow numbers
+    if (value === '' || /^\d+$/.test(value)) {
+      setBudgetRange(value);
+      setBudgetError('');
+    }
+  };
+
+  const validateBudget = () => {
+    if (!budgetRange.trim()) {
+      setBudgetError('Budget is required');
+      return false;
+    }
+    if (!/^\d+$/.test(budgetRange)) {
+      setBudgetError('Please enter only numbers');
+      return false;
+    }
+    setBudgetError('');
+    return true;
+  };
   
   // Profile picture management
   const profileImages = [ 
@@ -161,13 +185,23 @@ export default function ProfilePage() {
             {/* Budget Section */}
             <div className="mb-6">
               <label className="block text-xl font-medium text-gray-800 mb-2">
-                Budget
+                Budget <span className="text-red-500">*</span>
               </label>
-              <div className="flex w-full items-center px-5 py-2.5 bg-white rounded-[20px] border border-gray-300">
-                <span className="text-gray-500">
-                  {budgetRange}
-                </span>
+              <div className="flex w-full items-center px-5 py-2.5 bg-white rounded-[20px] border border-gray-300 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-200">
+                <span className="text-gray-500 mr-2">$</span>
+                <input
+                  type="text"
+                  value={budgetRange}
+                  onChange={handleBudgetChange}
+                  onBlur={validateBudget}
+                  placeholder="0-00000"
+                  className="flex-1 outline-none text-gray-800 placeholder-gray-400"
+                  required
+                />
               </div>
+              {budgetError && (
+                <p className="text-red-500 text-sm mt-1">{budgetError}</p>
+              )}
             </div>
 
             {/* Interests Section */}
@@ -198,7 +232,15 @@ export default function ProfilePage() {
             <div className="text-center">
               <button
                 type="button"
-                className="bg-[#231f20] hover:bg-gray-800 text-white font-bold py-3 px-8 rounded-[25px] transition-colors"
+                onClick={() => {
+                  if (validateBudget()) {
+                    // Handle profile save logic here
+                    console.log('Profile saved with budget:', budgetRange);
+                    alert('Profile saved successfully!');
+                  }
+                }}
+                className="bg-[#231f20] hover:bg-gray-800 text-white font-bold py-3 px-8 rounded-[25px] transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                disabled={!budgetRange.trim()}
               >
                 I&apos;m happy with my profile!
               </button>
