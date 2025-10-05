@@ -8,7 +8,8 @@ import logging
 from langchain.tools import tool
 from app.services.geo_api import fetch_cities_for_country
 from app.services.travel_data_api import fetch_points_of_interest, fetch_distance_between_cities
-from app.services.culture_data import fetch_itinerary_list
+from app.services.hotels import fetch_hotel_price, fetch_hotels_in_city
+from app.services.culture_data import fetch_cultural_insights
 from app.models.itinerary import Itinerary
 from app import db
 
@@ -50,6 +51,13 @@ def get_recommended_cities(country_name: str) -> List[str]:
                 country_name = parsed.get('country_name', '')
             except:
                 pass
+        
+        # Handle case where agent passes "country_name: Spain" format
+        if isinstance(country_name, str) and ':' in country_name:
+            # Extract the country name after the colon
+            parts = country_name.split(':', 1)
+            if len(parts) > 1:
+                country_name = parts[1].strip()
         
         cities = fetch_cities_for_country(country_name)
         return cities if cities else []
@@ -180,23 +188,6 @@ def calculate_travel_details(cities: Union[List[str], Dict[str, Any], str]) -> D
             'error': f'Error calculating distances: {str(e)}'
         }
 
-@tool
-def get_itinerary(poi: List[str], start_date: str, end_date: str) -> List[List[str]]:
-    """
-    Get a list of itineraries for a given point of interest.
-    Args:
-        poi (List[str]): List of points of interest
-        start_date (str): Start date of the trip
-        end_date (str): End date of the trip
-        
-    Returns:
-        List[List[str]]: List of itineraries
-    """
-    try:
-        return fetch_itinerary_list(poi, start_date, end_date)
-    except Exception as e:
-        print(f"Error getting itinerary: {str(e)}")
-        return []
 
 
 @tool
@@ -232,6 +223,37 @@ def save_itinerary(user_id: int, itinerary_name: str, cities: List[str], total_d
         print(f"Error saving itinerary: {str(e)}")
         return f"Error saving itinerary: {str(e)}"
 
+@tool
+def get_hotel_options(city: str) -> List[Dict[str, Any]]:
+    """
+    Finds hotel options for a given city for a specific date.
+    This is a simple tool that the AI can use to search for hotels.
+    """
+    return fetch_hotels_in_city(city)
+
+@tool
+def get_hotel_price(hotel_id: str, check_in_date: str, check_out_date: str, adults: int = 1) -> Dict[str, Any]:
+    """
+    Finds hotel price for a given hotel for a specific date.
+    This is a simple tool that the AI can use to search for hotel prices.
+    """
+    return fetch_hotel_price(hotel_id, check_in_date, check_out_date, adults)
+
+@tool
+def get_cultural_insights(poi: List[str]) -> Dict[str, Any]:
+    """
+    Finds cultural insights for a given point of interest.
+    This is a simple tool that the AI can use to search for cultural insights.
+    """
+    return fetch_cultural_insights(poi)
+
+@tool
+def get_events(itinerary: List[str]) -> Dict[str, Any]:
+    """
+    Finds cultural insights for a given point of interest.
+    This is a simple tool that the AI can use to search for cultural insights.
+    """
+    return fetch_cultural_insights(itinerary)
 
 @tool
 def create_multiple_itineraries(cities: Union[List[str], Dict[str, Any], str], origin_city: str = None, travel_date: str = None, destination_country: str = None, food_budget: float = None) -> List[Dict[str, Any]]:
@@ -281,36 +303,11 @@ def create_multiple_itineraries(cities: Union[List[str], Dict[str, Any], str], o
         if not isinstance(cities, list):
             cities = []
         
-        if len(cities) < 2:
+        if len(cities) < 1:
             return [{
-                'error': 'Need at least 2 cities to create itineraries',
-                'message': 'Please provide at least 2 cities to create itinerary options'
+                'error': 'Need at least 1 city to create itineraries',
+                'message': 'Please provide at least 1 city to create itinerary options'
             }]
-        
-        # Create different itinerary variations
-        import itertools
-        
-        # Generate different permutations (limit to reasonable number)
-        max_permutations = 5
-        city_permutations = list(itertools.permutations(cities))
-        
-        # Limit permutations to avoid too many options
-        if len(city_permutations) > max_permutations:
-            # Take first few permutations plus some strategic ones
-            selected_permutations = city_permutations[:3]  # First 3
-            # Add some strategic ones (reverse, middle variations)
-            if len(cities) >= 3:
-                # Add reverse order
-                selected_permutations.append(tuple(reversed(cities)))
-                # Add a middle variation if possible
-                if len(cities) >= 4:
-                    middle_variation = list(cities)
-                    # Swap middle elements
-                    mid = len(middle_variation) // 2
-                    middle_variation[mid-1], middle_variation[mid] = middle_variation[mid], middle_variation[mid-1]
-                    selected_permutations.append(tuple(middle_variation))
-        else:
-            selected_permutations = city_permutations
         
         # Get flight costs if flight parameters are provided
         flight_costs = []
@@ -328,46 +325,48 @@ def create_multiple_itineraries(cities: Union[List[str], Dict[str, Any], str], o
                     flights = search_flights(origin_iata, dest_iata, travel_date)
                     if flights:
                         # Extract prices from flight results
-                        flight_costs = [flight.get('price', 500) for flight in flights if 'price' in flight]
-                    else:
-                        flight_costs = [500]  # Default fallback
-                else:
-                    flight_costs = [500]  # Default fallback
+                        flight_costs = [flight.get('price') for flight in flights if 'price' in flight and flight.get('price') is not None]
                     
             except Exception as e:
-                print(f"Error getting flight costs: {str(e)}")
-                flight_costs = [500]  # Default estimated cost
+                logger.warning(f"Error getting flight costs: {str(e)}")
+        
+        # Create different itinerary variations
+        import itertools
+        
+        # Handle single city case
+        if len(cities) == 1:
+            # For single city, create one itinerary option
+            selected_permutations = [tuple(cities)]
+        else:
+            # Generate different permutations for multiple cities
+            city_permutations = list(itertools.permutations(cities))
+            
+            # Limit permutations to avoid too many options (max 5)
+            max_permutations = min(5, len(city_permutations))
+            selected_permutations = city_permutations[:max_permutations]
         
         # Calculate details for each permutation
         itinerary_options = []
         
-        for i, city_route in enumerate(selected_permutations[:max_permutations]):
+        for i, city_route in enumerate(selected_permutations):
             route_list = list(city_route)
             
-            # Calculate travel details for this route
-            travel_details = calculate_travel_details.invoke({"cities": route_list})
-            
-            if 'error' in travel_details:
-                continue  # Skip this route if calculation failed
-            
-            # Calculate land-based costs
-            distance_km = travel_details.get('total_distance_km', 0)
-            estimated_fuel_cost = distance_km * 0.15  # $0.15 per km for fuel
-            estimated_accommodation_cost = len(route_list) * 100  # $100 per city for accommodation (placeholder)
-            
-            # Use user's food budget if provided, otherwise ask for it
-            if food_budget is not None:
-                estimated_food_cost = food_budget
+            # Handle single city case differently
+            if len(route_list) == 1:
+                # For single city, no travel distance calculation needed
+                travel_details = {
+                    'total_distance_km': 0,
+                    'carbon_emissions_kg': 0
+                }
             else:
-                # If no food budget provided, use a default and note that user should specify
-                estimated_food_cost = len(route_list) * 40  # Default fallback
-                print("Note: Please specify your food budget for accurate cost calculations")
+                # Calculate travel details for multi-city routes
+                travel_details = calculate_travel_details.invoke({"cities": route_list})
+                
+                if 'error' in travel_details:
+                    continue  # Skip this route if calculation failed
             
-            land_based_cost = estimated_fuel_cost + estimated_accommodation_cost + estimated_food_cost
-            
-            # Add flight cost if available
-            flight_cost = flight_costs[0] if flight_costs else 0
-            total_cost = land_based_cost + flight_cost
+            # Get flight cost if available
+            flight_cost = flight_costs[i] if i < len(flight_costs) else (flight_costs[0] if flight_costs else 0)
             
             # Create itinerary option
             itinerary_option = {
@@ -376,18 +375,10 @@ def create_multiple_itineraries(cities: Union[List[str], Dict[str, Any], str], o
                 'cities': route_list,
                 'total_distance_km': travel_details.get('total_distance_km', 0),
                 'carbon_emissions_kg': travel_details.get('carbon_emissions_kg', 0),
-                'estimated_drive_time_hours': round(travel_details.get('total_distance_km', 0) / 60, 1),  # Assume 60 km/h average
+                'estimated_drive_time_hours': round(travel_details.get('total_distance_km', 0) / 60, 1),
                 'route_description': ' → '.join(route_list),
                 'costs': {
-                    'land_based_cost': round(land_based_cost, 2),
-                    'flight_cost': round(flight_cost, 2),
-                    'total_cost': round(total_cost, 2),
-                    'cost_breakdown': {
-                        'fuel': round(estimated_fuel_cost, 2),
-                        'accommodation': round(estimated_accommodation_cost, 2),
-                        'food': round(estimated_food_cost, 2),
-                        'flights': round(flight_cost, 2)
-                    }
+                    'flight_cost': round(flight_cost, 2) if flight_cost else 0
                 }
             }
             
@@ -399,7 +390,7 @@ def create_multiple_itineraries(cities: Union[List[str], Dict[str, Any], str], o
         return itinerary_options
         
     except Exception as e:
-        print(f"Error creating multiple itineraries: {str(e)}")
+        logger.error(f"Error creating multiple itineraries: {str(e)}")
         return [{
             'error': f'Error creating itineraries: {str(e)}',
             'message': 'Could not generate itinerary options'

@@ -7,10 +7,15 @@ import os
 import requests
 from typing import List, Dict, Any, Optional
 import logging
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 
 
 def get_city_coordinates(city_name: str) -> Optional[Dict[str, float]]:
@@ -24,6 +29,17 @@ def get_city_coordinates(city_name: str) -> Optional[Dict[str, float]]:
         Optional[Dict[str, float]]: Dictionary with 'lon' and 'lat' keys, or None on failure
     """
     try:
+        # Validate that we're not trying to geocode non-city parameters
+        if not city_name or isinstance(city_name, (int, float)):
+            logger.warning(f"Invalid city name provided: {city_name}")
+            return None
+        
+        # Check if the parameter looks like a date, budget, or other non-city value
+        city_str = str(city_name).lower().strip()
+        if any(indicator in city_str for indicator in ['2025-', '2024-', 'budget', 'food', 'travel_date', 'check_in', 'check_out']):
+            logger.warning(f"Parameter appears to be non-city data: {city_name}")
+            return None
+        
         api_key = os.environ.get('OPENTRIPMAP_API_KEY')
         if not api_key:
             logger.error("OPENTRIPMAP_API_KEY environment variable is required")
@@ -183,7 +199,6 @@ def fetch_points_of_interest(city_name: str) -> List[str]:
     except Exception as e:
         logger.error(f"Unexpected error fetching points of interest for {city_name}: {str(e)}")
         return []
-
 
 def fetch_distance_between_cities(cities: List[str]) -> Optional[Dict[str, Any]]:
     """

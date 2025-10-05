@@ -4,17 +4,23 @@ import React, { forwardRef, useImperativeHandle, useEffect, useRef } from 'react
 
 interface GlobeRef {
   zoomToCountry: (country: any) => void;
-  selectCountry: (country: any) => void;
+  selectCountry: (country: any, isSearchSelection?: boolean) => void;
+  enhancedZoomToCountry: (country: any) => void;
+  resumeRotation: () => void;
+  resetAppearance: () => void;
+  resetView: () => void;
 }
 
 interface GlobeProps {
   countriesData?: any;
   onCountrySelected?: (country: any) => void;
+  isSearchSelection?: boolean;
 }
 
-const GlobeComponent = forwardRef<GlobeRef, GlobeProps>(({ countriesData, onCountrySelected }, ref) => {
+const GlobeComponent = forwardRef<GlobeRef, GlobeProps>(({ countriesData, onCountrySelected, isSearchSelection }, ref) => {
   const globeRef = useRef<any>(null);
   const selectedCountryRef = useRef<any>(null);
+  const globeInstanceRef = useRef<any>(null);
 
   useImperativeHandle(ref, () => ({
     zoomToCountry: (country: any) => {
@@ -50,7 +56,40 @@ const GlobeComponent = forwardRef<GlobeRef, GlobeProps>(({ countriesData, onCoun
         }
       }
     },
-    selectCountry: (country: any) => {
+    enhancedZoomToCountry: (country: any) => {
+      if (globeRef.current && country) {
+        // Calculate country center
+        const coordinates = country.geometry.coordinates;
+        let totalLat = 0, totalLng = 0, pointCount = 0;
+        
+        const processCoords = (coords: any) => {
+          if (Array.isArray(coords[0])) {
+            if (typeof coords[0][0] === 'number') {
+              coords.forEach((coord: any) => {
+                if (Array.isArray(coord) && coord.length >= 2) {
+                  totalLng += coord[0];
+                  totalLat += coord[1];
+                  pointCount++;
+                }
+              });
+            } else {
+              coords.forEach((subCoords: any) => processCoords(subCoords));
+            }
+          }
+        };
+        
+        processCoords(coordinates);
+        
+        if (pointCount > 0) {
+          const centerLat = totalLat / pointCount;
+          const centerLng = totalLng / pointCount;
+          
+          // Enhanced zoom with much closer altitude for dramatic transition effect
+          globeRef.current.pointOfView({ lat: centerLat, lng: centerLng, altitude: 0.3 }, 2000);
+        }
+      }
+    },
+    selectCountry: (country: any, isSearchSelection?: boolean) => {
       if (globeRef.current && country) {
         // Store the selected country
         selectedCountryRef.current = country;
@@ -83,6 +122,9 @@ const GlobeComponent = forwardRef<GlobeRef, GlobeProps>(({ countriesData, onCoun
           
           // Zoom to country
           globeRef.current.pointOfView({ lat: centerLat, lng: centerLng, altitude: 1.5 }, 2000);
+          
+          // Stop auto-rotation when country is selected
+          globeRef.current.controls().autoRotate = false;
           
           // Add pop-out effect with enhanced altitude and color
           setTimeout(() => {
@@ -136,14 +178,47 @@ const GlobeComponent = forwardRef<GlobeRef, GlobeProps>(({ countriesData, onCoun
               return '';
             });
             
-            // Notify parent component that country selection is complete
+            // Only notify parent component if this is NOT a search selection
+            // Search selections should show confirmation modal instead
             setTimeout(() => {
-              if (onCountrySelected) {
+              console.log('Globe selectCountry timeout - isSearchSelection param:', isSearchSelection, 'prop:', isSearchSelection, 'onCountrySelected:', !!onCountrySelected);
+              if (onCountrySelected && !isSearchSelection) {
+                console.log('Calling onCountrySelected from selectCountry');
                 onCountrySelected(country);
+              } else {
+                console.log('Not calling onCountrySelected - search selection or no callback');
               }
-            }, 500); // Wait for pop-out animation to complete
-          }, 1000); // Start pop-out effect after zoom begins
+            }, 300); // Wait for pop-out animation to complete
+          }, 600); // Start pop-out effect after zoom begins
         }
+      }
+    },
+    resumeRotation: () => {
+      if (globeInstanceRef.current) {
+        globeInstanceRef.current.controls().autoRotate = true;
+        globeInstanceRef.current.controls().autoRotateSpeed = 0.3;
+      }
+    },
+    resetView: () => {
+      if (globeInstanceRef.current) {
+        globeInstanceRef.current.pointOfView({ altitude: 1.8 }, 2000);
+      }
+    },
+    resetAppearance: () => {
+      if (globeInstanceRef.current) {
+        console.log('Resetting globe appearance...');
+        // Reset all visual effects
+        globeInstanceRef.current.polygonAltitude(() => 0.02);
+        globeInstanceRef.current.polygonCapColor(() => '#CFDECB');
+        globeInstanceRef.current.polygonSideColor(() => 'rgba(207, 222, 203, 0.1)');
+        globeInstanceRef.current.polygonLabel(() => '');
+        selectedCountryRef.current = null;
+        console.log('Globe appearance reset - extrusion effects removed');
+        
+        // Force a refresh of the globe to ensure changes are applied
+        globeInstanceRef.current.polygonsData(globeInstanceRef.current.polygonsData());
+      } else {
+        console.log('Globe instance not found for reset');
       }
     },
   }));
@@ -219,11 +294,16 @@ const GlobeComponent = forwardRef<GlobeRef, GlobeProps>(({ countriesData, onCoun
 
         // Smooth auto-rotate with gentle speed
         globe.controls().autoRotate = true;
-        globe.controls().autoRotateSpeed = 0.2;
+        globe.controls().autoRotateSpeed = 0.5;
         
         // Enhanced hover effects with smooth transitions
         globe.polygonsTransitionDuration(300);
         globe.onPolygonHover((hoverD: any, prevHoverD: any) => {
+          // Don't apply hover effects if there's a selected country
+          if (selectedCountryRef.current) {
+            return;
+          }
+          
           if (hoverD) {
             globe.polygonAltitude((d: any) => d === hoverD ? 0.05 : 0.02);
             globe.polygonCapColor((d: any) => d === hoverD ? '#ABC8F1' : '#CFDECB');
@@ -237,12 +317,100 @@ const GlobeComponent = forwardRef<GlobeRef, GlobeProps>(({ countriesData, onCoun
         globe.onPolygonClick((clickedCountry: any) => {
           if (clickedCountry && onCountrySelected) {
             console.log('Country clicked:', clickedCountry.properties.ADMIN || clickedCountry.properties.NAME);
+            // Store the clicked country and trigger the selection effects
+            selectedCountryRef.current = clickedCountry;
+            
+            // Apply the same visual effects as selectCountry
+            const coordinates = clickedCountry.geometry.coordinates;
+            let totalLat = 0, totalLng = 0, pointCount = 0;
+            
+            const processCoords = (coords: any) => {
+              if (Array.isArray(coords[0])) {
+                if (typeof coords[0][0] === 'number') {
+                  coords.forEach((coord: any) => {
+                    if (Array.isArray(coord) && coord.length >= 2) {
+                      totalLng += coord[0];
+                      totalLat += coord[1];
+                      pointCount++;
+                    }
+                  });
+                } else {
+                  coords.forEach((subCoords: any) => processCoords(subCoords));
+                }
+              }
+            };
+            
+            processCoords(coordinates);
+            
+            if (pointCount > 0) {
+              const centerLat = totalLat / pointCount;
+              const centerLng = totalLng / pointCount;
+              
+              // Zoom to country
+              globe.pointOfView({ lat: centerLat, lng: centerLng, altitude: 1.5 }, 2000);
+              
+              // Stop auto-rotation
+              globe.controls().autoRotate = false;
+              
+              // Add pop-out effect immediately (no delay)
+              globe.polygonAltitude((d: any) => {
+                if (d === clickedCountry) return 0.15; // Pop out the selected country
+                return 0.02; // Keep others at base level
+              });
+              
+              globe.polygonCapColor((d: any) => {
+                if (d === clickedCountry) return '#F2F37F'; // Yellow highlight for selected
+                return '#CFDECB'; // Default land color for others
+              });
+              
+              globe.polygonSideColor((d: any) => {
+                if (d === clickedCountry) return 'rgba(242, 243, 127, 0.3)'; // Yellow sides for selected
+                return 'rgba(207, 222, 203, 0.1)'; // Default land sides
+              });
+              
+              // Add the landmark indicator
+              globe.polygonLabel((d: any) => {
+                if (d === clickedCountry) {
+                  return `
+                    <div style="
+                      background: white;
+                      border-radius: 50%;
+                      width: 50px;
+                      height: 50px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                      border: 4px solid #ff6b35;
+                      box-shadow: 0 6px 20px rgba(255, 107, 53, 0.4);
+                      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                      font-size: 24px;
+                      font-weight: bold;
+                      color: #ff6b35;
+                      position: relative;
+                      animation: pulse 2s infinite;
+                    ">
+                      📍
+                    </div>
+                    <style>
+                      @keyframes pulse {
+                        0% { transform: scale(1); }
+                        50% { transform: scale(1.1); }
+                        100% { transform: scale(1); }
+                      }
+                    </style>
+                  `;
+                }
+                return '';
+              });
+            }
+            
             onCountrySelected(clickedCountry);
           }
         });
         
         // Store globe instance for zoom functionality
         globeRef.current = globe;
+        globeInstanceRef.current = globe;
         
         // Configure country polygons when data is available
         if (countriesData && countriesData.features) {

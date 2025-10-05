@@ -34,10 +34,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(JSON.parse(storedUser));
     }
     
-    // Set up API client with token provider
-    setupApiClient(() => token);
-    
     setIsLoading(false);
+  }, []);
+
+  // Update API client whenever token changes
+  useEffect(() => {
+    setupApiClient(() => token);
   }, [token]);
 
   const login = (newToken: string, newUser: User) => {

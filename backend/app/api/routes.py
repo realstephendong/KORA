@@ -6,9 +6,10 @@ Defines public and protected endpoints with Auth0 authentication.
 from flask import Blueprint, jsonify, g, request
 from app.api.auth import require_auth_decorator, handle_auth_error, AuthError
 from app.models.user import User
+from app.models.itinerary import Itinerary
 from app import db
 from app.agent.agent_executor import create_travel_agent, parse_chat_history, invoke_agent_with_history
-from app.agent.tools import get_recommended_cities, get_points_of_interest, calculate_travel_details, save_itinerary
+from app.agent.tools import get_recommended_cities, get_points_of_interest, calculate_travel_details, save_itinerary, find_flight_options, create_multiple_itineraries
 from functools import partial
 
 # Create API blueprint
@@ -41,30 +42,124 @@ def create_travel_agent_with_user(user_id: int):
     )
     
     # Create a user-specific version of save_itinerary with user_id pre-filled
-    save_itinerary_with_user = partial(save_itinerary, user_id)
-    save_itinerary_with_user.__name__ = 'save_itinerary'
-    save_itinerary_with_user.__doc__ = save_itinerary.__doc__
+    from langchain.tools import tool
+    
+    @tool
+    def save_itinerary_with_user(itinerary_name: str, cities: list = None, total_distance_km: float = 0.0, carbon_emissions_kg: float = 0.0) -> str:
+        """Save completed travel plans to the database for the current user."""
+        try:
+            # Handle case where agent passes all parameters as a single string
+            if isinstance(itinerary_name, str) and ',' in itinerary_name and 'cities=' in itinerary_name:
+                # Parse the combined string that the agent is sending
+                import re
+                import ast
+                
+                # Extract itinerary name (everything before the first comma with cities=)
+                name_match = re.search(r'^([^,]+?)(?=, cities=)', itinerary_name)
+                if name_match:
+                    itinerary_name = name_match.group(1).strip()
+                
+                # Extract cities list
+                cities_match = re.search(r"cities=\[([^\]]+)\]", itinerary_name)
+                if cities_match:
+                    cities_str = cities_match.group(1)
+                    cities = [city.strip().strip("'\"") for city in cities_str.split(',')]
+                
+                # Extract total_distance_km
+                distance_match = re.search(r'total_distance_km=([0-9.]+)', itinerary_name)
+                if distance_match:
+                    total_distance_km = float(distance_match.group(1))
+                
+                # Extract carbon_emissions_kg
+                carbon_match = re.search(r'carbon_emissions_kg=([0-9.]+)', itinerary_name)
+                if carbon_match:
+                    carbon_emissions_kg = float(carbon_match.group(1))
+            
+            # Ensure cities is a list
+            if cities is None:
+                cities = []
+            
+            return save_itinerary.invoke({
+                'user_id': user_id,
+                'itinerary_name': itinerary_name,
+                'cities': cities,
+                'total_distance_km': total_distance_km,
+                'carbon_emissions_kg': carbon_emissions_kg
+            })
+        except Exception as e:
+            return f"Error saving itinerary: {str(e)}"
     
     # Define available tools with user-specific save_itinerary
-    tools = [get_recommended_cities, get_points_of_interest, calculate_travel_details, save_itinerary_with_user]
+    tools = [get_recommended_cities, get_points_of_interest, calculate_travel_details, save_itinerary_with_user, find_flight_options, create_multiple_itineraries]
     
     # Pull the standard ReAct prompt from LangChain Hub
     prompt = hub.pull("hwchase17/react-chat")
     
     # Add custom system message to make agent aware of new capabilities
-    system_message = """You are a travel planning assistant with the following capabilities:
+    system_message = """You are a travel planning assistant. Help users plan their trips by providing city recommendations and itinerary options.
 
-1. **get_recommended_cities**: Get top cities for any country
-2. **get_points_of_interest**: Find real attractions and landmarks for any city using live OpenTripMap data
-3. **calculate_travel_details**: Calculate total driving distance and carbon emissions between cities using OpenRouteService
-4. **save_itinerary**: Save completed travel plans to the database (use this as the final step when user confirms they're happy with the plan)
+## CRITICAL RULES:
+- NEVER mention tool names in your responses
+- NEVER show "Action:" or "Action Input:" in your responses  
+- NEVER mention that you're using tools or APIs
+- Keep responses concise and natural
+- If you get stuck, ask a simple question to move forward
+- Focus on travel recommendations, not technical details
 
-Your workflow should be:
-1. Help users discover cities in their desired country
-2. Find real attractions for each city using live data
-3. Calculate travel logistics (distance, carbon footprint) for the complete route
-4. Present the full itinerary with all details
-5. Ask if they want to save the itinerary, and use save_itinerary if they confirm
+## IMPORTANT: Always follow the ReAct pattern correctly:
+- After "Thought:", you MUST include "Action:" and "Action Input:"
+- If you don't need to use a tool, end with "Final Answer:"
+- Never leave "Thought:" without a follow-up action
+
+## INITIAL WORKFLOW (Country is already selected by user):
+
+**FIRST RESPONSE - Acknowledge Country & Get Basic Info:**
+When a user says "I want to visit [COUNTRY]", you should:
+1. Acknowledge their choice enthusiastically: "Great choice! [COUNTRY] is an amazing destination!"
+2. Ask for their travel dates: "When are you planning to travel? Please provide your departure and return dates."
+3. Ask for their origin: "Where will you be traveling from? (city and country)"
+4. Ask about their travel style: "What type of experience are you looking for? (cultural, adventure, relaxation, etc.)"
+5. Ask for duration: "How many days are you planning to stay? (e.g., 3 days, 1 week, etc.)"
+
+**Layer 1 - City Discovery:**
+- Suggest top cities in that country
+- Let the user choose cities they're interested in (even if just one city)
+
+**Layer 2 - Attraction Discovery:**
+- For each selected city, ask: "What places do you want to visit in [CITY]?"
+- Suggest real attractions and landmarks
+- Let the user select their preferred attractions for each city
+
+**Layer 3 - Itinerary Creation:**
+- Ask the user for their food budget for the entire trip
+- Generate itinerary options based on their city selections
+- For single cities: Create a detailed single-city itinerary with multiple day options
+- For multiple cities: Create different city orders/routes with distance and carbon calculations
+- Present itinerary options with:
+  - Different routes (if multiple cities) or day-by-day plans (if single city)
+  - Total distance and carbon emissions (if applicable)
+  - Estimated travel time and total costs
+  - Cost breakdown (flights, accommodation, food, fuel)
+  - Key attractions included
+
+**Layer 4 - Flight Planning (Optional):**
+- Only if user wants to fly to the country, ask for their departure city and travel date
+- Find flight options and present them with carbon impact
+
+**Final Phase:**
+- Present all itinerary options with filters for price and carbon emissions
+- Show cost breakdowns and total costs for each option
+- Let user select their preferred itinerary
+- Offer to save the final selected itinerary
+
+IMPORTANT: Always follow this sequence:
+- Start by acknowledging their country choice and asking for dates/origin
+- Then get city recommendations
+- Then get attraction preferences for each city
+- Create itinerary options with calculations
+- Present options with filters
+- Only handle flights if user specifically requests them
+- Save the final selected itinerary
 
 Always aim to provide real, up-to-date information and complete travel plans that users can actually execute."""
     
@@ -85,7 +180,8 @@ Always aim to provide real, up-to-date information and complete travel plans tha
         verbose=True,
         return_intermediate_steps=True,
         handle_parsing_errors=True,
-        max_iterations=3
+        max_iterations=5,  # Allow enough iterations for proper workflow
+        max_execution_time=30  # Add time limit
     )
     
     return agent_executor
@@ -126,6 +222,7 @@ def private_endpoint():
 def get_user_profile():
     """
     Get or create user profile based on Auth0 subject.
+    Uses stored user data from SQLite database.
     
     Returns:
         dict: JSON response with user profile information
@@ -140,18 +237,33 @@ def get_user_profile():
                 'error_description': 'Token does not contain subject identifier'
             }), 401
         
-        # Find or create user
-        user = User.find_by_auth0_sub(auth0_sub)
-        if not user:
-            user = User.create_or_get_user(auth0_sub)
+        # Try to get user information from JWT token (if available)
+        # Check for custom claims first, then fall back to standard claims
+        jwt_email = g.current_user.get('https://kora-travel.com/email') or g.current_user.get('email')
+        jwt_name = g.current_user.get('https://kora-travel.com/name') or g.current_user.get('name')
+        
+        print(f"DEBUG: JWT claims available: {list(g.current_user.keys())}")
+        print(f"DEBUG: Full JWT payload: {g.current_user}")
+        print(f"DEBUG: Extracted email: {jwt_email}")
+        print(f"DEBUG: Extracted name: {jwt_name}")
+        
+        # Find or create user, updating with any available info from JWT
+        user = User.create_or_get_user(
+            auth0_sub=auth0_sub,
+            name=jwt_name,
+            email=jwt_email
+        )
+        
+        # Use stored user data for auth0_info
+        auth0_info = {
+            'sub': auth0_sub,
+            'email': user.email or 'Not available',
+            'name': user.name or 'Not available'
+        }
         
         return jsonify({
             'user': user.to_dict(),
-            'auth0_info': {
-                'sub': g.current_user.get('sub'),
-                'email': g.current_user.get('email'),
-                'name': g.current_user.get('name')
-            },
+            'auth0_info': auth0_info,
             'status': 'success'
         }), 200
         
@@ -208,6 +320,9 @@ def chat_message():
         # Get chat history (optional, defaults to empty list)
         chat_history_data = data.get('chat_history', [])
         
+        # Get country context (optional)
+        country_context = data.get('country_context', None)
+        
         # Validate chat history format
         if not isinstance(chat_history_data, list):
             return jsonify({
@@ -233,13 +348,34 @@ def chat_message():
         # Create the travel agent with user-specific tools
         agent_executor = create_travel_agent_with_user(user.id)
         
+        # Add country context to the message if provided
+        if country_context:
+            country_name = country_context.get('name', 'Unknown')
+            user_message = f"I want to visit {country_name}. {user_message}"
+        
         # Invoke the agent with the user message and history
         result = invoke_agent_with_history(agent_executor, user_message, chat_history)
         
+        # Convert intermediate steps to JSON-serializable format
+        intermediate_steps = result.get('intermediate_steps', [])
+        serializable_steps = []
+        for step in intermediate_steps:
+            if hasattr(step, '__dict__'):
+                # Convert AgentAction objects to dictionaries
+                step_dict = {
+                    'tool': getattr(step, 'tool', ''),
+                    'tool_input': getattr(step, 'tool_input', ''),
+                    'log': getattr(step, 'log', '')
+                }
+                serializable_steps.append(step_dict)
+            else:
+                # Handle string or other serializable types
+                serializable_steps.append(str(step))
+        
         # Return structured response
         response_data = {
-            'response': result['output'],
-            'intermediate_steps': result.get('intermediate_steps', []),
+            'response': result.get('output', ''),
+            'intermediate_steps': serializable_steps,
             'success': result.get('success', True),
             'timestamp': g.current_user.get('sub', 'unknown')  # Include user context
         }
@@ -251,10 +387,208 @@ def chat_message():
         return jsonify(response_data), 200
         
     except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"Error in chat endpoint: {str(e)}")
+        print(f"Traceback: {error_trace}")
         return jsonify({
             'error': 'server_error',
-            'error_description': f'Internal server error: {str(e)}'
+            'error_description': f'Internal server error: {str(e)}',
+            'traceback': error_trace
         }), 500
+
+
+@api_bp.route('/itineraries', methods=['GET'])
+@require_auth_decorator
+def get_user_itineraries():
+    """
+    Get all itineraries for the authenticated user.
+    
+    Returns:
+        dict: JSON response with user's itineraries
+    """
+    try:
+        # Get Auth0 subject from the JWT payload
+        auth0_sub = g.current_user.get('sub')
+        
+        if not auth0_sub:
+            return jsonify({
+                'error': 'invalid_token',
+                'error_description': 'Token does not contain subject identifier'
+            }), 401
+        
+        # Find user
+        user = User.find_by_auth0_sub(auth0_sub)
+        if not user:
+            return jsonify({
+                'error': 'user_not_found',
+                'error_description': 'User not found'
+            }), 404
+        
+        # Get all itineraries for the user
+        itineraries = Itinerary.query.filter_by(user_id=user.id).order_by(Itinerary.created_at.desc()).all()
+        
+        return jsonify({
+            'itineraries': [itinerary.to_dict() for itinerary in itineraries],
+            'status': 'success'
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'error': 'server_error',
+            'error_description': str(e)
+        }), 500
+
+
+@api_bp.route('/itineraries/<int:itinerary_id>', methods=['GET'])
+@require_auth_decorator
+def get_itinerary_details(itinerary_id):
+    """
+    Get detailed information about a specific itinerary.
+    
+    Args:
+        itinerary_id (int): ID of the itinerary to retrieve
+        
+    Returns:
+        dict: JSON response with detailed itinerary information
+    """
+    try:
+        # Get Auth0 subject from the JWT payload
+        auth0_sub = g.current_user.get('sub')
+        
+        if not auth0_sub:
+            return jsonify({
+                'error': 'invalid_token',
+                'error_description': 'Token does not contain subject identifier'
+            }), 401
+        
+        # Find user
+        user = User.find_by_auth0_sub(auth0_sub)
+        if not user:
+            return jsonify({
+                'error': 'user_not_found',
+                'error_description': 'User not found'
+            }), 404
+        
+        # Find the specific itinerary
+        itinerary = Itinerary.query.filter_by(id=itinerary_id, user_id=user.id).first()
+        if not itinerary:
+            return jsonify({
+                'error': 'itinerary_not_found',
+                'error_description': 'Itinerary not found or access denied'
+            }), 404
+        
+        # Return detailed itinerary information
+        return jsonify({
+            'itinerary': itinerary.to_dict(),
+            'status': 'success'
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'error': 'server_error',
+            'error_description': str(e)
+        }), 500
+
+
+@api_bp.route('/itineraries/<int:itinerary_id>/export', methods=['GET'])
+@require_auth_decorator
+def export_itinerary(itinerary_id):
+    """
+    Export a specific itinerary as structured JSON for frontend consumption.
+    Includes carbon emissions data for visualization.
+    
+    Args:
+        itinerary_id (int): ID of the itinerary to export
+        
+    Returns:
+        dict: JSON response with structured itinerary data
+    """
+    try:
+        # Get Auth0 subject from the JWT payload
+        auth0_sub = g.current_user.get('sub')
+        
+        if not auth0_sub:
+            return jsonify({
+                'error': 'invalid_token',
+                'error_description': 'Token does not contain subject identifier'
+            }), 401
+        
+        # Find user
+        user = User.find_by_auth0_sub(auth0_sub)
+        if not user:
+            return jsonify({
+                'error': 'user_not_found',
+                'error_description': 'User not found'
+            }), 404
+        
+        # Find the specific itinerary
+        itinerary = Itinerary.query.filter_by(id=itinerary_id, user_id=user.id).first()
+        if not itinerary:
+            return jsonify({
+                'error': 'itinerary_not_found',
+                'error_description': 'Itinerary not found or access denied'
+            }), 404
+        
+        # Create structured export data
+        export_data = {
+            'id': itinerary.id,
+            'name': itinerary.name,
+            'cities': itinerary.to_dict()['cities'],
+            'carbon_emissions': {
+                'total_kg': itinerary.carbon_emissions_kg or 0,
+                'breakdown': {
+                    'driving': itinerary.carbon_emissions_kg or 0,
+                    'flights': 0  # Could be extended to include flight emissions
+                }
+            },
+            'distance': {
+                'total_km': itinerary.total_distance_km or 0,
+                'breakdown': {
+                    'driving': itinerary.total_distance_km or 0,
+                    'flights': 0  # Could be extended to include flight distances
+                }
+            },
+            'metadata': {
+                'created_at': itinerary.created_at.isoformat() if itinerary.created_at else None,
+                'updated_at': itinerary.updated_at.isoformat() if itinerary.updated_at else None,
+                'user_id': itinerary.user_id
+            },
+            'visualization': {
+                'carbon_emissions_kg': itinerary.carbon_emissions_kg or 0,
+                'distance_km': itinerary.total_distance_km or 0,
+                'city_count': len(itinerary.to_dict()['cities']),
+                'emissions_per_city': (itinerary.carbon_emissions_kg or 0) / max(len(itinerary.to_dict()['cities']), 1),
+                'distance_per_city': (itinerary.total_distance_km or 0) / max(len(itinerary.to_dict()['cities']), 1)
+            }
+        }
+        
+        return jsonify({
+            'itinerary': export_data,
+            'status': 'success'
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'error': 'server_error',
+            'error_description': str(e)
+        }), 500
+
+
+@api_bp.route('/debug/auth', methods=['GET'])
+@require_auth_decorator
+def debug_auth():
+    """
+    Debug endpoint to check authentication status.
+    
+    Returns:
+        dict: JSON response with authentication debug info
+    """
+    return jsonify({
+        'status': 'authenticated',
+        'user': g.current_user,
+        'message': 'Authentication is working'
+    }), 200
 
 
 @api_bp.route('/health', methods=['GET'])
