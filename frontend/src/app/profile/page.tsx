@@ -54,13 +54,12 @@ export default function ProfilePage() {
   
   // Profile picture management
   const profileImages = [
-    'trashbag.svg',
-    'tree1.svg', 
-    'tree2.svg',
-    'turtle blue.svg',
-    'turtle green.svg',
-    'turtle pink.svg',
-    'turtle purple.svg'
+    '/profile/tree1.svg', 
+    '/profile/tree2.svg',
+    '/profile/turtle blue.svg',
+    '/profile/turtle green.svg',
+    '/profile/turtle pink.svg',
+    '/profile/turtle purple.svg'
   ];
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
