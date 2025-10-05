@@ -5,6 +5,9 @@ const AUTH0_CLIENT_ID = process.env.AUTH0_CLIENT_ID || 'EBaffK1uS7nzjhQZvu5rV8mu
 const AUTH0_CLIENT_SECRET = process.env.AUTH0_CLIENT_SECRET || 'idG3QPnTjt7UL2SetE6HTt4XUALxB87Illyprbd9R1f6Mk0NH1_V1AOOSLFU2N1m';
 const AUTH0_AUDIENCE = process.env.AUTH0_AUDIENCE || 'https://dev-flmsl50bypxcwox4.us.auth0.com/api/v2/';
 
+// Simple in-memory cache to prevent code reuse
+const usedCodes = new Set<string>();
+
 export async function POST(request: NextRequest) {
   try {
     const { code } = await request.json();
@@ -12,6 +15,15 @@ export async function POST(request: NextRequest) {
     if (!code) {
       return NextResponse.json({ error: 'Authorization code is required' }, { status: 400 });
     }
+
+    // Check if code has already been used
+    if (usedCodes.has(code)) {
+      console.error('Authorization code already used:', code.substring(0, 10) + '...');
+      return NextResponse.json({ error: 'Authorization code has already been used' }, { status: 400 });
+    }
+
+    // Mark code as used
+    usedCodes.add(code);
 
     // Exchange authorization code for access token
     const tokenResponse = await fetch(`https://${AUTH0_DOMAIN}/oauth/token`, {
@@ -24,7 +36,7 @@ export async function POST(request: NextRequest) {
         client_id: AUTH0_CLIENT_ID,
         client_secret: AUTH0_CLIENT_SECRET,
         code: code,
-        redirect_uri: `${process.env.AUTH0_BASE_URL || 'http://localhost:3000'}/callback`,
+        redirect_uri: 'http://localhost:3000/callback',
         audience: AUTH0_AUDIENCE,
       }),
     });
@@ -32,7 +44,20 @@ export async function POST(request: NextRequest) {
     if (!tokenResponse.ok) {
       const error = await tokenResponse.text();
       console.error('Token exchange failed:', error);
-      return NextResponse.json({ error: 'Failed to exchange code for token' }, { status: 400 });
+      console.error('Request details:', {
+        domain: AUTH0_DOMAIN,
+        client_id: AUTH0_CLIENT_ID,
+        redirect_uri: 'http://localhost:3000/callback',
+        code_length: code.length
+      });
+      
+      // Remove the code from used set if exchange failed
+      usedCodes.delete(code);
+      
+      return NextResponse.json({ 
+        error: 'Failed to exchange code for token', 
+        details: error 
+      }, { status: 400 });
     }
 
     const tokenData = await tokenResponse.json();
