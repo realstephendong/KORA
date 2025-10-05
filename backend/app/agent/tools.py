@@ -8,7 +8,8 @@ import logging
 from langchain.tools import tool
 from app.services.geo_api import fetch_cities_for_country
 from app.services.travel_data_api import fetch_points_of_interest, fetch_distance_between_cities
-from app.services.culture_data import fetch_itinerary_list
+from app.services.hotels import fetch_hotel_price, fetch_hotels_in_city
+from app.services.culture_data import fetch_cultural_insights
 from app.models.itinerary import Itinerary
 from app import db
 
@@ -180,23 +181,6 @@ def calculate_travel_details(cities: Union[List[str], Dict[str, Any], str]) -> D
             'error': f'Error calculating distances: {str(e)}'
         }
 
-@tool
-def get_itinerary(poi: List[str], start_date: str, end_date: str) -> List[List[str]]:
-    """
-    Get a list of itineraries for a given point of interest.
-    Args:
-        poi (List[str]): List of points of interest
-        start_date (str): Start date of the trip
-        end_date (str): End date of the trip
-        
-    Returns:
-        List[List[str]]: List of itineraries
-    """
-    try:
-        return fetch_itinerary_list(poi, start_date, end_date)
-    except Exception as e:
-        print(f"Error getting itinerary: {str(e)}")
-        return []
 
 
 @tool
@@ -232,6 +216,29 @@ def save_itinerary(user_id: int, itinerary_name: str, cities: List[str], total_d
         print(f"Error saving itinerary: {str(e)}")
         return f"Error saving itinerary: {str(e)}"
 
+@tool
+def get_hotel_options(city: str) -> List[Dict[str, Any]]:
+    """
+    Finds hotel options for a given city for a specific date.
+    This is a simple tool that the AI can use to search for hotels.
+    """
+    return fetch_hotels_in_city(city)
+
+@tool
+def get_hotel_price(hotel_id: str, check_in_date: str, check_out_date: str, adults: int = 1) -> Dict[str, Any]:
+    """
+    Finds hotel price for a given hotel for a specific date.
+    This is a simple tool that the AI can use to search for hotel prices.
+    """
+    return fetch_hotel_price(hotel_id, check_in_date, check_out_date, adults)
+
+@tool
+def get_cultural_insights(poi: List[str]) -> Dict[str, Any]:
+    """
+    Finds cultural insights for a given point of interest.
+    This is a simple tool that the AI can use to search for cultural insights.
+    """
+    return fetch_cultural_insights(poi)
 
 @tool
 def create_multiple_itineraries(cities: Union[List[str], Dict[str, Any], str], origin_city: str = None, travel_date: str = None, destination_country: str = None, food_budget: float = None) -> List[Dict[str, Any]]:

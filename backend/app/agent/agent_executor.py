@@ -44,6 +44,9 @@ def create_travel_agent() -> AgentExecutor:
 3. **calculate_travel_details**: Calculate total driving distance and carbon emissions between cities using OpenRouteService
 4. **create_multiple_itineraries**: Create multiple itinerary variations with different city orders and carbon calculations
 5. **get_itinerary**: Get detailed itineraries with costs for specific points of interest and dates
+6. **get_hotel_options**: Get hotel options for a given city for a specific date
+7. **get_hotel_price**: Get hotel price for a given hotel for a specific date
+8. **get_cultural_insights**: Get cultural insights for a given point of interest
 6. **find_flight_options**: Find flight options from origin city to destination country with carbon impact estimates
 7. **save_itinerary**: Save completed travel plans to the database (use this as the final step when user confirms they're happy with the plan)
 

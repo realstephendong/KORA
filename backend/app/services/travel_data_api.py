@@ -7,10 +7,15 @@ import os
 import requests
 from typing import List, Dict, Any, Optional
 import logging
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 
 
 def get_city_coordinates(city_name: str) -> Optional[Dict[str, float]]:
@@ -183,7 +188,6 @@ def fetch_points_of_interest(city_name: str) -> List[str]:
     except Exception as e:
         logger.error(f"Unexpected error fetching points of interest for {city_name}: {str(e)}")
         return []
-
 
 def fetch_distance_between_cities(cities: List[str]) -> Optional[Dict[str, Any]]:
     """
