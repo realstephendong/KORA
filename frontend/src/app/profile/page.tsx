@@ -154,13 +154,13 @@ export default function ProfilePage() {
               onClick={() => router.push('/landing')}
               className="px-6 py-3 bg-[#d8dfe9] hover:bg-gray-200 text-[#231f20] font-bold rounded-[25px] border border-solid border-black transition-colors [font-family:'Onest',Helvetica]"
             >
-              ← Back to Landing
+              Back to Landing
             </button>
             <button
               onClick={() => router.push('/globe')}
               className="px-6 py-3 bg-[#eeefa4] hover:bg-yellow-200 text-[#231f20] font-bold rounded-[25px] border border-solid border-black transition-colors [font-family:'Onest',Helvetica]"
             >
-              🌍 Explore Globe
+              Explore Globe
             </button>
           </div>
           
