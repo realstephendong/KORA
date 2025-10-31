@@ -186,15 +186,3 @@ We're planning to add:
 ## Contributing
 
 Contributions are welcome. Feel free to open a pull request.
-
-## License
-
-[Add your license here]
-
-## Acknowledgments
-
-Built for a more sustainable future.
-
----
-
-**KORA** - Making sustainable travel planning simple, fun, and accessible.
