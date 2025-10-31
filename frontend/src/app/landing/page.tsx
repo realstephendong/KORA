@@ -38,6 +38,10 @@ export default function LandingPage() {
     }, 1500);
   };
 
+  const handleViewResults = () => {
+    router.push('/result');
+  };
+
   if (isLoading) {
     return (
       <LoadingPage message="Loading..." />
@@ -76,25 +80,31 @@ export default function LandingPage() {
         </h2>
 
         {/* Action buttons card */}
-        <div className="w-full max-w-xl lg:max-w-2xl xl:max-w-[500px] bg-gradient-to-b from-[rgba(216,223,233,0.35)] to-[rgba(216,223,233,0.10)] backdrop-blur-[10px] rounded-3xl lg:rounded-[40px] border-2 border-[rgba(216,223,233,0.70)] p-5 lg:p-6 xl:p-8">
+        <div className="w-full max-w-4xl lg:max-w-5xl xl:max-w-6xl bg-gradient-to-b from-[rgba(216,223,233,0.35)] to-[rgba(216,223,233,0.10)] backdrop-blur-[10px] rounded-3xl lg:rounded-[40px] border-2 border-[rgba(216,223,233,0.70)] p-5 lg:p-6 xl:p-8">
           {/* Action buttons */}
-          <div className="flex flex-col sm:flex-row gap-6 sm:gap-8 justify-center items-center">
+          <div className="flex flex-row gap-3 lg:gap-4 justify-center items-center">
             {user ? (
               <>
                 <button 
-                  className="w-full sm:w-auto px-5 py-2.5 lg:px-6 lg:py-3 rounded-full bg-[#D8DFE9] text-[#212121] text-center font-['Onest'] text-sm lg:text-base font-bold cursor-pointer transition-all duration-300 hover:transform hover:-translate-y-1 hover:shadow-[0_4px_20px_0_#FFF]"
+                  className="px-5 py-2.5 lg:px-6 lg:py-3 rounded-full bg-[#D8DFE9] text-[#212121] text-center font-['Onest'] text-sm lg:text-base font-bold cursor-pointer transition-all duration-300 hover:transform hover:-translate-y-1 hover:shadow-[0_4px_20px_0_#FFF]"
                   onClick={handleViewProfile}
                 >
                   View Profile
                 </button>
                 <button 
-                  className="w-full sm:w-auto px-5 py-2.5 lg:px-6 lg:py-3 rounded-full bg-[#212121] text-[#EFEFEF] text-center font-['Onest'] text-sm lg:text-base font-bold cursor-pointer transition-all duration-300 hover:bg-[#212121] hover:transform hover:-translate-y-1"
+                  className="px-5 py-2.5 lg:px-6 lg:py-3 rounded-full bg-[#212121] text-[#EFEFEF] text-center font-['Onest'] text-sm lg:text-base font-bold cursor-pointer transition-all duration-300 hover:bg-[#212121] hover:transform hover:-translate-y-1"
                   onClick={handleStartPlanning}
                 >
                   Start Planning
                 </button>
                 <button 
-                  className="w-full sm:w-auto px-5 py-2.5 lg:px-6 lg:py-3 rounded-full bg-[#212121] text-[#EFEFEF] text-center font-['Onest'] text-sm lg:text-base font-bold cursor-pointer transition-all duration-300 hover:bg-[#212121] hover:transform hover:-translate-y-1"
+                  className="px-5 py-2.5 lg:px-6 lg:py-3 rounded-full bg-[#212121] text-[#EFEFEF] text-center font-['Onest'] text-sm lg:text-base font-bold cursor-pointer transition-all duration-300 hover:bg-[#212121] hover:transform hover:-translate-y-1"
+                  onClick={handleViewResults}
+                >
+                  View Results
+                </button>
+                <button 
+                  className="px-5 py-2.5 lg:px-6 lg:py-3 rounded-full bg-[#212121] text-[#EFEFEF] text-center font-['Onest'] text-sm lg:text-base font-bold cursor-pointer transition-all duration-300 hover:bg-[#212121] hover:transform hover:-translate-y-1"
                   onClick={handleLogout}
                 >
                   Logout
@@ -103,16 +113,22 @@ export default function LandingPage() {
             ) : (
               <>
                 <button 
-                  className="w-full sm:w-auto px-5 py-2.5 lg:px-6 lg:py-3 rounded-full bg-[#D8DFE9] text-[#212121] text-center font-['Onest'] text-sm lg:text-base font-bold cursor-pointer transition-all duration-300 hover:transform hover:-translate-y-1 hover:shadow-[0_4px_20px_0_#FFF]"
+                  className="px-5 py-2.5 lg:px-6 lg:py-3 rounded-full bg-[#D8DFE9] text-[#212121] text-center font-['Onest'] text-sm lg:text-base font-bold cursor-pointer transition-all duration-300 hover:transform hover:-translate-y-1 hover:shadow-[0_4px_20px_0_#FFF]"
                   onClick={handleCreateProfile}
                 >
                   Create Your Profile
                 </button>
                 <button 
-                  className="w-full sm:w-auto px-5 py-2.5 lg:px-6 lg:py-3 rounded-full bg-[#212121] text-[#EFEFEF] text-center font-['Onest'] text-sm lg:text-base font-bold cursor-pointer transition-all duration-300 hover:bg-[#212121] hover:transform hover:-translate-y-1 hover:shadow-[0_4px_20px_0_rgba(33,33,33,0.3)]"
+                  className="px-5 py-2.5 lg:px-6 lg:py-3 rounded-full bg-[#212121] text-[#EFEFEF] text-center font-['Onest'] text-sm lg:text-base font-bold cursor-pointer transition-all duration-300 hover:bg-[#212121] hover:transform hover:-translate-y-1 hover:shadow-[0_4px_20px_0_rgba(33,33,33,0.3)]"
                   onClick={handleLogin}
                 >
                   Login
+                </button>
+                <button 
+                  className="px-5 py-2.5 lg:px-6 lg:py-3 rounded-full bg-[#212121] text-[#EFEFEF] text-center font-['Onest'] text-sm lg:text-base font-bold cursor-pointer transition-all duration-300 hover:bg-[#212121] hover:transform hover:-translate-y-1 hover:shadow-[0_4px_20px_0_rgba(33,33,33,0.3)]"
+                  onClick={handleViewResults}
+                >
+                  View Results
                 </button>
               </>
             )}

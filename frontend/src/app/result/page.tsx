@@ -106,7 +106,7 @@ const CongratulationsSection = ({
   const { treesSaved, plasticBagsSaved } = calculateEnvironmentalImpact(itinerary.carbon_emissions_kg);
 
   return (
-  <section className="w-full max-w-2xl mx-auto mb-8 rounded-[30px] overflow-hidden border-2 border-solid border-[#d8dfe980] backdrop-blur-sm backdrop-brightness-[100%] [-webkit-backdrop-filter:blur(4px)_brightness(100%)] bg-[rgba(255,255,255,0.2)] relative min-h-[400px]">
+  <section className="w-full max-w-2xl mx-auto mb-8 rounded-[30px] overflow-hidden border-2 border-solid border-[#d8dfe980] backdrop-blur-sm backdrop-brightness-[100%] [-webkit-backdrop-filter:blur(4px)_brightness(100%)] bg-[rgba(255,255,255,0.2)]">
     <div className="p-6 text-center">
       <div className="text-gray-600 text-lg mb-4">
         We&apos;ve calculated your trip!
@@ -115,34 +115,6 @@ const CongratulationsSection = ({
       <h1 className="text-3xl md:text-4xl font-normal italic text-black mb-8">
         Congratulations!
       </h1>
-
-      {/* Bar chart container */}
-      <div className="relative h-48 mb-6 flex items-end justify-center gap-2">
-        {/* Bar chart elements */}
-        <div className="w-7 h-48 bg-white rounded-[23px]" />
-        <div className="w-5 h-20 bg-[#cfdecb] rounded-[23px]" />
-        <div className="w-7 h-48 bg-white rounded-[23px]" />
-        <div className="w-7 h-48 bg-white rounded-[23px]" />
-        <div className="w-5 h-32 bg-[#abc7f0] rounded-[23px]" />
-        <div className="w-5 h-24 bg-[#f1f37e] rounded-[23px]" />
-
-        {/* Icons positioned over bars */}
-        <Image
-          className="absolute bottom-4 left-1/2 transform -translate-x-1/2 w-12 h-12"
-          alt="Tree"
-          src="https://c.animaapp.com/7Y4W5hAe/img/tree2@2x.png"
-          width={48}
-          height={48}
-        />
-
-        <Image
-          className="absolute bottom-8 left-1/2 transform -translate-x-1/2 w-10 h-10"
-          alt="Trash bag"
-          src="https://c.animaapp.com/7Y4W5hAe/img/trash-bag@2x.png"
-          width={40}
-          height={40}
-        />
-      </div>
 
       <p className="text-gray-600 text-sm md:text-base leading-relaxed">
         You&apos;ve saved the equivalent of {treesSaved} trees, {plasticBagsSaved.toLocaleString()} plastic bags from
@@ -533,12 +505,25 @@ export default function ResultPage() {
       }
       
       console.log('Fetching all itineraries...');
+      console.log('Token available:', !!token);
+      console.log('API base URL:', process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000');
+      
       const data = await itineraryApi.getAllItineraries();
       console.log('Received itineraries data:', data);
       console.log('Number of itineraries:', data.itineraries?.length || 0);
-      setItineraries(data.itineraries);
+      console.log('Full response structure:', JSON.stringify(data, null, 2));
+      
+      if (data.itineraries && Array.isArray(data.itineraries)) {
+        setItineraries(data.itineraries);
+        console.log('Successfully set itineraries:', data.itineraries.length);
+      } else {
+        console.log('No itineraries array found in response');
+        setItineraries([]);
+      }
     } catch (error) {
       console.error('Error fetching saved itineraries:', error);
+      console.error('Error details:', error.message);
+      setItineraries([]);
     } finally {
       setLoading(false);
     }
