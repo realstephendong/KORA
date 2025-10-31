@@ -23,7 +23,7 @@ def create_travel_agent() -> AgentExecutor:
     """
     # Initialize Google Gemini model (free tier)
     llm = ChatGoogleGenerativeAI(
-        model="gemini-2.5-pro",
+        model="gemini-2.5-flash",
         temperature=0,
         convert_system_message_to_human=True,
         google_api_key=os.environ.get('GOOGLE_API_KEY')
@@ -141,7 +141,7 @@ Track what information you have and what you still need:
         tools=tools,
         verbose=True,
         return_intermediate_steps=True,
-        handle_parsing_errors=True,  # Use custom error handler
+        handle_parsing_errors=enhanced_parsing_error_handler,  # Use custom error handler
         max_iterations=4000,  # Further reduce iterations to prevent loops
         max_execution_time=60000,  # Reduce time limit to prevent hanging
     )
@@ -224,17 +224,26 @@ def invoke_agent_with_history(
         
         # Detect incomplete ReAct pattern
         if (has_thought and not has_action and not has_final_answer) or any(error in output_text for error in parsing_errors):
-            # Try to extract the thought content to provide a more contextual response
+            # Try to extract the full thought content to provide a more contextual response
             thought_content = ""
             if "Thought:" in output_text:
                 try:
                     thought_start = output_text.find("Thought:") + len("Thought:")
-                    thought_end = output_text.find("\n", thought_start)
-                    if thought_end == -1:
-                        thought_end = len(output_text)
-                    thought_content = output_text[thought_start:thought_end].strip()
+                    # Extract everything after "Thought:" until the end or next major section
+                    thought_content = output_text[thought_start:].strip()
+                    # Clean up any remaining formatting issues
+                    thought_content = thought_content.replace("Invalid Format: Missing 'Action:' after 'Thought:'", "").strip()
                 except:
                     thought_content = ""
+            
+            # If we have substantial thought content, use it as the response
+            if thought_content and len(thought_content) > 50:
+                return {
+                    "output": thought_content,
+                    "intermediate_steps": [],
+                    "success": True,  # Treat as successful since we have useful content
+                    "error": None
+                }
             
             # Provide contextual fallback based on conversation state
             if "city" in thought_content.lower() or "cities" in thought_content.lower():

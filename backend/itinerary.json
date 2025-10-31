@@ -1,1 +1,53 @@
-"{\n  \"itinerary_info\": {\n    \"name\": \"Test Itinerary\",\n    \"user_id\": 99999,\n    \"created_at\": \"2025-10-05T08:46:37.570744\",\n    \"version\": \"1.0\"\n  },\n  \"travel_details\": {\n    \"cities\": [\n      \"Test City\"\n    ],\n    \"total_distance_km\": 100.0,\n    \"carbon_emissions_kg\": 12.0,\n    \"estimated_drive_time_hours\": 1.7\n  },\n  \"sustainability_metrics\": {\n    \"carbon_per_km\": 0.12,\n    \"carbon_per_city\": 12.0,\n    \"distance_per_city\": 100.0\n  },\n  \"metadata\": {\n    \"city_count\": 1,\n    \"is_multi_city\": false,\n    \"saved_via\": \"ai_agent\"\n  }\n}"
+[
+  {
+    "itinerary_info": {
+      "name": "UK Heritage Tour - London & Birmingham",
+      "user_id": 99999,
+      "created_at": "2024-11-20T10:30:00.000000",
+      "version": "1.0",
+      "departure_date": "2024-11-25",
+      "return_date": "2024-12-01",
+      "origin_city": "Toronto, Canada"
+    },
+    "travel_details": {
+      "cities": [
+        "London, UK",
+        "Birmingham, UK"
+      ],
+      "attractions": [
+        {
+          "name": "Queen Eleanor Memorial Cross",
+          "city": "London",
+          "type": "historical_monument",
+          "description": "A memorial cross dedicated to Queen Eleanor of Castile"
+        },
+        {
+          "name": "Lunar Society",
+          "city": "Birmingham", 
+          "type": "historical_society",
+          "description": "Historical meeting place of the Lunar Society of Birmingham"
+        }
+      ],
+      "total_distance_km": 5840.0,
+      "carbon_emissions_kg": 1168.0,
+      "estimated_flight_time_hours": 7.5,
+      "inter_city_distance_km": 190.0,
+      "inter_city_carbon_kg": 38.0
+    },
+    "sustainability_metrics": {
+      "carbon_per_km": 0.20,
+      "carbon_per_city": 603.0,
+      "distance_per_city": 3015.0,
+      "flight_emissions_kg": 1168.0,
+      "ground_transport_kg": 38.0
+    },
+    "metadata": {
+      "city_count": 2,
+      "is_multi_city": true,
+      "saved_via": "ai_agent",
+      "trip_duration_days": 6,
+      "primary_attractions": 2,
+      "fallback_option": "London only with Queen Eleanor Memorial Cross"
+    }
+  }
+]

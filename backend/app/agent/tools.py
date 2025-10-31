@@ -237,18 +237,55 @@ def save_itinerary(user_id: int, itinerary_name: str, cities: List[str], total_d
             }
         }
         
-        # Convert to JSON string for storage
-        itinerary_json = json.dumps(itinerary_data, indent=2)
+        # Save the itinerary data to JSON file
+        import os
         
+        # Get the current working directory and construct proper paths
+        current_dir = os.getcwd()
+        print(f"DEBUG: Current working directory: {current_dir}")
+        
+        # Define paths relative to the project root
+        main_itinerary_path = os.path.join(current_dir, 'backend', 'itinerary.json')
+        agent_itinerary_path = os.path.join(current_dir, 'backend', 'app', 'agent', 'itinerary.json')
+        
+        print(f"DEBUG: Main itinerary path: {main_itinerary_path}")
+        print(f"DEBUG: Agent itinerary path: {agent_itinerary_path}")
+        
+        # Create directories if they don't exist
+        os.makedirs(os.path.dirname(main_itinerary_path), exist_ok=True)
+        os.makedirs(os.path.dirname(agent_itinerary_path), exist_ok=True)
+        
+        # Load existing itineraries or create new structure
+        all_itineraries = []
+        
+        if os.path.exists(main_itinerary_path):
+            try:
+                with open(main_itinerary_path, 'r') as f:
+                    existing_data = json.load(f)
+                    if isinstance(existing_data, list):
+                        all_itineraries = existing_data
+                    else:
+                        # If it's a single itinerary, convert to list
+                        all_itineraries = [existing_data]
+            except (json.JSONDecodeError, FileNotFoundError):
+                all_itineraries = []
+        
+        # Add new itinerary to the list
+        all_itineraries.append(itinerary_data)
+        
+        # Save all itineraries to main JSON file
+        with open(main_itinerary_path, 'w') as json_file:
+            json.dump(all_itineraries, json_file, indent=2)
+        
+        # Also save to agent directory for backup
+        with open(agent_itinerary_path, 'w') as json_file:
+            json.dump(all_itineraries, json_file, indent=2)
 
+        print(f"DEBUG: Saved itinerary JSON data to backend/itinerary.json")
+        print(f"DEBUG: Total itineraries: {len(all_itineraries)}")
+        print(f"DEBUG: Latest itinerary data: {json.dumps(itinerary_data, indent=2)}")
         
-        # Store the JSON data in the enhanced fields # Using attractions field to store JSON data
-        
-        with open('backend\\app\\agent\\itinerary.json', 'w') as json_file:
-            json.dump(itinerary_json, json_file, indent=4)
-
-        print(f"DEBUG: Saved itinerary JSON data: {itinerary_json}")
-        
+        return f"Successfully saved itinerary '{itinerary_name}' with {len(cities)} cities, {total_distance_km}km total distance, and {carbon_emissions_kg}kg CO₂ emissions."
         
     except Exception as e:
         print(f"Error saving itinerary: {str(e)}")

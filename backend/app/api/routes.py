@@ -529,12 +529,16 @@ def chat_message():
 @require_auth_decorator
 def get_user_itineraries():
     """
-    Get all itineraries for the authenticated user.
+    Get all itineraries for the authenticated user from JSON files.
     
     Returns:
         dict: JSON response with user's itineraries
     """
     try:
+        import json
+        import os
+        from datetime import datetime
+        
         # Get Auth0 subject from the JWT payload
         auth0_sub = g.current_user.get('sub')
         
@@ -552,15 +556,104 @@ def get_user_itineraries():
                 'error_description': 'User not found'
             }), 404
         
-        # Get all itineraries for the user
-        itineraries = Itinerary.query.filter_by(user_id=user.id).order_by(Itinerary.created_at.desc()).all()
+        # Read itineraries from JSON files
+        itineraries = []
+        
+        # Check for main itinerary.json file
+        main_itinerary_path = os.path.join(os.path.dirname(__file__), '..', '..', 'itinerary.json')
+        agent_itinerary_path = os.path.join(os.path.dirname(__file__), '..', 'agent', 'itinerary.json')
+        
+        print(f"DEBUG: Looking for JSON files at:")
+        print(f"  - Main path: {main_itinerary_path}")
+        print(f"  - Agent path: {agent_itinerary_path}")
+        print(f"  - Main exists: {os.path.exists(main_itinerary_path)}")
+        print(f"  - Agent exists: {os.path.exists(agent_itinerary_path)}")
+        
+        # Try to read from both possible locations
+        for path in [main_itinerary_path, agent_itinerary_path]:
+            if os.path.exists(path):
+                try:
+                    with open(path, 'r') as f:
+                        content = f.read().strip()
+                        if content:
+                            # Parse the JSON content
+                            itinerary_data = json.loads(content)
+                            
+                            print(f"DEBUG: Successfully loaded JSON from {path}")
+                            print(f"DEBUG: Data type: {type(itinerary_data)}")
+                            print(f"DEBUG: Data content: {json.dumps(itinerary_data, indent=2)}")
+                            
+                            # Handle both single itinerary and list of itineraries
+                            if isinstance(itinerary_data, list):
+                                print(f"DEBUG: Processing {len(itinerary_data)} itineraries")
+                                # Multiple itineraries
+                                for idx, itinerary in enumerate(itinerary_data):
+                                    transformed_itinerary = {
+                                        'id': idx + 1,
+                                        'user_id': user.id,
+                                        'name': itinerary.get('itinerary_info', {}).get('name', f'Itinerary {idx + 1}'),
+                                        'cities': itinerary.get('travel_details', {}).get('cities', []),
+                                        'total_distance_km': itinerary.get('travel_details', {}).get('total_distance_km', 0),
+                                        'carbon_emissions_kg': itinerary.get('travel_details', {}).get('carbon_emissions_kg', 0),
+                                        'country': None,
+                                        'travel_dates': None,
+                                        'duration_days': None,
+                                        'attractions': None,
+                                        'flight_info': None,
+                                        'estimated_costs': None,
+                                        'created_at': itinerary.get('itinerary_info', {}).get('created_at', datetime.now().isoformat()),
+                                        'updated_at': datetime.now().isoformat()
+                                    }
+                                    itineraries.append(transformed_itinerary)
+                                    print(f"DEBUG: Added itinerary {idx + 1}: {transformed_itinerary['name']}")
+                            else:
+                                print(f"DEBUG: Processing single itinerary")
+                                # Single itinerary
+                                transformed_itinerary = {
+                                    'id': 1,
+                                    'user_id': user.id,
+                                    'name': itinerary_data.get('itinerary_info', {}).get('name', 'Untitled Itinerary'),
+                                    'cities': itinerary_data.get('travel_details', {}).get('cities', []),
+                                    'total_distance_km': itinerary_data.get('travel_details', {}).get('total_distance_km', 0),
+                                    'carbon_emissions_kg': itinerary_data.get('travel_details', {}).get('carbon_emissions_kg', 0),
+                                    'country': None,
+                                    'travel_dates': None,
+                                    'duration_days': None,
+                                    'attractions': None,
+                                    'flight_info': None,
+                                    'estimated_costs': None,
+                                    'created_at': itinerary_data.get('itinerary_info', {}).get('created_at', datetime.now().isoformat()),
+                                    'updated_at': datetime.now().isoformat()
+                                }
+                                itineraries.append(transformed_itinerary)
+                                print(f"DEBUG: Added single itinerary: {transformed_itinerary['name']}")
+                            
+                            break  # Only read from the first found file
+                            
+                except (json.JSONDecodeError, KeyError) as e:
+                    print(f"Error parsing JSON from {path}: {e}")
+                    continue
+        
+        print(f"DEBUG: Final itineraries count: {len(itineraries)}")
+        print(f"DEBUG: Final itineraries: {json.dumps([{'id': i['id'], 'name': i['name'], 'cities': i['cities']} for i in itineraries], indent=2)}")
+        
+        # If no JSON files found, return empty list
+        if not itineraries:
+            return jsonify({
+                'itineraries': [],
+                'status': 'success',
+                'message': 'No itineraries found in JSON files'
+            }), 200
         
         return jsonify({
-            'itineraries': [itinerary.to_dict() for itinerary in itineraries],
+            'itineraries': itineraries,
             'status': 'success'
         }), 200
         
     except Exception as e:
+        print(f"Error in get_user_itineraries: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({
             'error': 'server_error',
             'error_description': str(e)
